@@ -38,9 +38,12 @@ export default function Home() {
         </p>
 
         <div className="mt-12 flex flex-col sm:flex-row gap-4 justify-center">
-          <button className="px-8 py-4 rounded-full border border-white/20 hover:bg-white hover:text-black transition duration-500">
+          <Link
+            href="/start"
+            className="px-8 py-4 rounded-full border border-white/20 hover:bg-white hover:text-black transition duration-500"
+          >
             시작하기
-          </button>
+          </Link>
 
           <Link
             href="/explore"
