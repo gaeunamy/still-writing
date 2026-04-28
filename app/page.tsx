@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { motion } from "framer-motion";
 
 export default function Home() {
@@ -40,9 +42,12 @@ export default function Home() {
             시작하기
           </button>
 
-          <button className="px-8 py-4 rounded-full border border-white/10 hover:border-white/40 transition duration-500">
+          <Link
+            href="/explore"
+            className="px-8 py-4 rounded-full border border-white/10 hover:border-white/40 transition duration-500"
+          >
             조용히 둘러보기
-          </button>
+          </Link>
         </div>
       </motion.div>
     </main>
