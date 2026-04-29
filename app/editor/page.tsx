@@ -3,9 +3,16 @@
 import { useEffect, useState } from "react";
 
 type WritingSetup = {
+  genre: string;
+
   mood: string;
   speaker: string;
+  image: string;
+
+  view: string;
   setting: string;
+  ending: string;
+
   length: string;
 };
 
@@ -15,11 +22,18 @@ export default function EditorPage() {
   const [loading, setLoading] = useState(false);
 
   const [setup, setSetup] = useState<WritingSetup>({
-    mood: "",
-    speaker: "",
-    setting: "",
-    length: "",
-  });
+  genre: "",
+
+  mood: "",
+  speaker: "",
+  image: "",
+
+  view: "",
+  setting: "",
+  ending: "",
+
+  length: "",
+});
 
   useEffect(() => {
     const saved = localStorage.getItem("writingSetup");
@@ -32,15 +46,31 @@ export default function EditorPage() {
   const handleGenerate = async () => {
     setLoading(true);
 
-    const prompt = `
-${setup.mood} 분위기,
-${setup.speaker} 시점,
-${setup.setting} 배경,
-${setup.length} 분량으로
+    let prompt = "";
 
-감성적인 첫 문장을 제안해주세요.
-직접 창작할 수 있도록 여운을 남겨주세요.
-`;
+    if (setup.genre === "시") {
+      prompt = `
+    ${setup.mood} 정서,
+    ${setup.speaker} 화자,
+    ${setup.image} 이미지,
+    ${setup.length} 분량으로
+
+    감성적인 시의 첫 문장을 제안해주세요.
+    직접 이어 쓸 수 있도록 여운을 남겨주세요.
+    `;
+    }
+
+    if (setup.genre === "소설") {
+      prompt = `
+    ${setup.view} 시점,
+    ${setup.setting} 배경,
+    ${setup.ending} 결말 분위기,
+    ${setup.length} 분량으로
+
+    독자가 몰입할 수 있는 소설의 첫 장면을 제안해주세요.
+    장면이 시작되는 첫 문장을 써주세요.
+    `;
+    }
 
     try {
       const response = await fetch("/api/generate", {
