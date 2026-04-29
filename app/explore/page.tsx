@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 
 const writings = [
@@ -45,16 +45,29 @@ const writings = [
 export default function ExplorePage() {
   const [openedCard, setOpenedCard] = useState<number | null>(null);
 
+  const [stars, setStars] = useState<
+    { top: string; left: string }[]
+  >([]);
+
+  useEffect(() => {
+    const generatedStars = [...Array(12)].map(() => ({
+      top: `${Math.random() * 100}%`,
+      left: `${Math.random() * 100}%`,
+    }));
+
+    setStars(generatedStars);
+  }, []);
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-black text-white px-6 py-20">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(12)].map((_, i) => (
+        {stars.map((star, i) => (
           <motion.div
             key={i}
             className="absolute w-2 h-2 rounded-full bg-white/30"
             style={{
-              top: `${Math.random() * 100}%`,
-              left: `${Math.random() * 100}%`,
+              top: star.top,
+              left: star.left,
             }}
             animate={{
               opacity: [0.2, 0.8, 0.2],
@@ -95,6 +108,8 @@ export default function ExplorePage() {
                 {item.preview}
               </p>
 
+              // TODO:
+              // expand animation with AnimatePresence later
               {openedCard === index && (
                 <p className="mt-6 text-sm opacity-70 leading-relaxed">
                   {item.fullText}
