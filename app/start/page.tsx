@@ -1,5 +1,7 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+
 const genres = [
   {
     title: "시",
@@ -16,6 +18,13 @@ const genres = [
 ];
 
 export default function StartPage() {
+  const router = useRouter();
+
+  const handleSelectGenre = (genre: string) => {
+    localStorage.setItem("selectedGenre", genre);
+    router.push("/mode");
+  };
+
   return (
     <main className="min-h-screen bg-black text-white px-6 py-20">
       <div className="max-w-5xl mx-auto text-center">
@@ -32,6 +41,7 @@ export default function StartPage() {
           {genres.map((genre) => (
             <button
               key={genre.title}
+              onClick={() => handleSelectGenre(genre.title)}
               className="rounded-3xl border border-white/10 p-8 text-left hover:border-white/30 hover:bg-white/[0.02] transition duration-500"
             >
               <h2 className="text-2xl font-light mb-4">
