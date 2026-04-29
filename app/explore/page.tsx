@@ -1,3 +1,7 @@
+"use client";
+
+import { motion } from "framer-motion";
+
 const writings = [
   {
     emotion: "새벽",
@@ -27,8 +31,31 @@ const writings = [
 
 export default function ExplorePage() {
   return (
-    <main className="min-h-screen bg-black text-white px-6 py-20">
-      <div className="max-w-6xl mx-auto">
+    <main className="relative min-h-screen overflow-hidden bg-black text-white px-6 py-20">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+
+  {[...Array(12)].map((_, i) => (
+    <motion.div
+      key={i}
+      className="absolute w-2 h-2 rounded-full bg-white/30"
+      style={{
+        top: `${Math.random() * 100}%`,
+        left: `${Math.random() * 100}%`,
+      }}
+      animate={{
+        opacity: [0.2, 0.8, 0.2],
+        y: [0, -10, 0],
+      }}
+      transition={{
+        duration: 4 + i,
+        repeat: Infinity,
+        ease: "easeInOut",
+      }}
+    />
+  ))}
+
+</div>
+      <div className="relative z-10 max-w-6xl mx-auto">
 
         <p className="text-xs tracking-[0.4em] uppercase opacity-50 mb-6">
           quiet explore
