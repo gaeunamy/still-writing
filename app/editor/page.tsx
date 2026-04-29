@@ -22,18 +22,18 @@ export default function EditorPage() {
   const [loading, setLoading] = useState(false);
 
   const [setup, setSetup] = useState<WritingSetup>({
-  genre: "",
+    genre: "",
 
-  mood: "",
-  speaker: "",
-  image: "",
+    mood: "",
+    speaker: "",
+    image: "",
 
-  view: "",
-  setting: "",
-  ending: "",
+    view: "",
+    setting: "",
+    ending: "",
 
-  length: "",
-});
+    length: "",
+  });
 
   useEffect(() => {
     const saved = localStorage.getItem("writingSetup");
@@ -50,26 +50,26 @@ export default function EditorPage() {
 
     if (setup.genre === "시") {
       prompt = `
-    ${setup.mood} 정서,
-    ${setup.speaker} 화자,
-    ${setup.image} 이미지,
-    ${setup.length} 분량으로
+${setup.mood} 정서,
+${setup.speaker} 화자,
+${setup.image} 이미지,
+${setup.length} 분량으로
 
-    감성적인 시의 첫 문장을 제안해주세요.
-    직접 이어 쓸 수 있도록 여운을 남겨주세요.
-    `;
+감성적인 시의 첫 문장을 제안해주세요.
+직접 이어 쓸 수 있도록 여운을 남겨주세요.
+`;
     }
 
     if (setup.genre === "소설") {
       prompt = `
-    ${setup.view} 시점,
-    ${setup.setting} 배경,
-    ${setup.ending} 결말 분위기,
-    ${setup.length} 분량으로
+${setup.view} 시점,
+${setup.setting} 배경,
+${setup.ending} 결말 분위기,
+${setup.length} 분량으로
 
-    독자가 몰입할 수 있는 소설의 첫 장면을 제안해주세요.
-    장면이 시작되는 첫 문장을 써주세요.
-    `;
+독자가 몰입할 수 있는 소설의 첫 장면을 제안해주세요.
+장면이 시작되는 첫 문장을 써주세요.
+`;
     }
 
     try {
@@ -95,10 +95,31 @@ export default function EditorPage() {
     setLoading(false);
   };
 
+  const handleSave = () => {
+    const savedPosts = JSON.parse(
+      localStorage.getItem("savedWritings") || "[]"
+    );
+
+    const newPost = {
+      id: Date.now(),
+      title,
+      content,
+      createdAt: new Date().toISOString(),
+    };
+
+    const updatedPosts = [newPost, ...savedPosts];
+
+    localStorage.setItem(
+      "savedWritings",
+      JSON.stringify(updatedPosts)
+    );
+
+    alert("글이 저장되었습니다.");
+  };
+
   return (
     <main className="min-h-screen bg-black text-white px-6 py-16">
       <div className="max-w-4xl mx-auto">
-
         <p className="text-xs tracking-[0.4em] uppercase opacity-50 mb-6">
           writing room
         </p>
@@ -119,7 +140,6 @@ export default function EditorPage() {
         />
 
         <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-between items-center">
-
           <p className="text-sm opacity-50">
             지금의 분위기: {setup.mood || "설정 없음"}
           </p>
@@ -133,11 +153,13 @@ export default function EditorPage() {
               {loading ? "생성 중..." : "AI 도움 받기"}
             </button>
 
-            <button className="px-6 py-3 rounded-full border border-white/20 hover:bg-white hover:text-black transition duration-500">
+            <button
+              onClick={handleSave}
+              className="px-6 py-3 rounded-full border border-white/20 hover:bg-white hover:text-black transition duration-500"
+            >
               저장하기
             </button>
           </div>
-
         </div>
       </div>
     </main>
