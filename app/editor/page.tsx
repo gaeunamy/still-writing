@@ -1,14 +1,46 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+type WritingSetup = {
+  mood: string;
+  speaker: string;
+  setting: string;
+  length: string;
+};
 
 export default function EditorPage() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const [setup, setSetup] = useState<WritingSetup>({
+    mood: "",
+    speaker: "",
+    setting: "",
+    length: "",
+  });
+
+  useEffect(() => {
+    const saved = localStorage.getItem("writingSetup");
+
+    if (saved) {
+      setSetup(JSON.parse(saved));
+    }
+  }, []);
+
   const handleGenerate = async () => {
     setLoading(true);
+
+    const prompt = `
+${setup.mood} 분위기,
+${setup.speaker} 시점,
+${setup.setting} 배경,
+${setup.length} 분량으로
+
+감성적인 첫 문장을 제안해주세요.
+직접 창작할 수 있도록 여운을 남겨주세요.
+`;
 
     try {
       const response = await fetch("/api/generate", {
@@ -17,8 +49,7 @@ export default function EditorPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          prompt:
-            "고요한 새벽, 잊지 못한 여름, 끝내 하지 못한 말을 주제로 첫 문장을 제안해주세요.",
+          prompt,
         }),
       });
 
@@ -60,7 +91,7 @@ export default function EditorPage() {
         <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-between items-center">
 
           <p className="text-sm opacity-50">
-            지금의 감정: 고요한 새벽
+            지금의 분위기: {setup.mood || "설정 없음"}
           </p>
 
           <div className="flex gap-3">
