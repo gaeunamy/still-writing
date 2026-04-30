@@ -23,10 +23,29 @@ type Writing = {
   building_id: string;
 };
 
+type Star = {
+  id: number;
+  x: number;
+  y: number;
+  size: number;
+  dur: number;
+  delay: number;
+  op: number;
+};
+
+const WINDOW_COLORS = [
+  "#ffd97d", // warm yellow
+  "#ffb347", // amber
+  "#a8daff", // cool blue
+  "#ffa8c5", // soft pink
+  "#b8f0b8", // mint
+  "#e8d5ff", // lavender
+];
+
 const GENRE_COLOR: Record<string, string> = {
-  시: "#c8a8d8",
-  소설: "#a8c4e0",
-  일기: "#e0d0a8",
+  시: "#d8c8e8",
+  소설: "#b8ccd8",
+  일기: "#e8d8b0",
 };
 
 const GENRE_WIDTH: Record<string, number> = {
@@ -41,23 +60,32 @@ const GENRE_LABEL: Record<string, string> = {
   일기: "일기탑",
 };
 
+// 건물+층+유닛 기반으로 일관된 창문 색상 (랜덤 아님)
+function getWindowColorByIndex(index: number) {
+  return WINDOW_COLORS[index % WINDOW_COLORS.length];
+}
+
 export default function CityPage() {
   const router = useRouter();
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [loading, setLoading] = useState(true);
   const [risingId, setRisingId] = useState<string | null>(null);
-  const [stars] = useState(() =>
-    Array.from({ length: 70 }, (_, i) => ({
-      id: i,
-      x: Math.random() * 100,
-      y: Math.random() * 75,
-      size: Math.random() * 1.8 + 0.4,
-      dur: 3 + Math.random() * 5,
-      delay: Math.random() * 6,
-    }))
-  );
+  const [floatingLabel, setFloatingLabel] = useState<{ id: string; text: string } | null>(null);
+  const [stars, setStars] = useState<Star[]>([]);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   useEffect(() => {
+    setStars(
+      Array.from({ length: 70 }, (_, i) => ({
+        id: i,
+        x: Math.random() * 100,
+        y: Math.random() * 75,
+        size: Math.random() * 1.8 + 0.4,
+        dur: 3 + Math.random() * 5,
+        delay: Math.random() * 6,
+        op: 0.25 + Math.random() * 0.55,
+      }))
+    );
     fetchCity();
   }, []);
 
@@ -79,32 +107,42 @@ export default function CityPage() {
       .select("id, title, floor, unit, emotion_color, building_id")
       .in("building_id", bData.map((b) => b.id));
 
-    setBuildings(
-      bData.map((b) => ({
-        ...b,
-        writings: (wData ?? []).filter((w) => w.building_id === b.id),
-      }))
-    );
+    const enriched = bData.map((b) => ({
+      ...b,
+      writings: (wData ?? []).filter((w) => w.building_id === b.id),
+    }));
+
+    setBuildings(enriched);
     setLoading(false);
+
+    // 가장 최근 건물에 floating label 표시
+    if (enriched.length > 0) {
+      const latest = enriched[enriched.length - 1];
+      const total = enriched.reduce((a, b) => a + b.writings.length, 0);
+      setFloatingLabel({
+        id: latest.id,
+        text: `${total}편의 글이 살고 있습니다`,
+      });
+      setTimeout(() => setFloatingLabel(null), 3000);
+    }
   }
 
   const isEmpty = !loading && buildings.length === 0;
 
-  // 건물 SVG 높이 계산 (층수 기반)
   function getBuildingHeight(b: Building) {
-    const base = 60;
-    const perFloor = 18;
-    return base + b.floor_count * perFloor;
+    return 60 + b.floor_count * 18;
   }
 
-  // 창문이 켜져 있는지 (글이 해당 위치에 있는지)
   function isWindowLit(b: Building, floor: number, unit: number) {
     return b.writings.some((w) => w.floor === floor && w.unit === unit);
   }
 
   function getWindowColor(b: Building, floor: number, unit: number) {
     const w = b.writings.find((wr) => wr.floor === floor && wr.unit === unit);
-    return w?.emotion_color ?? GENRE_COLOR[b.genre] ?? "#e0d0b0";
+    if (w?.emotion_color) return w.emotion_color;
+    // 위치 기반으로 일관된 색상
+    const idx = (floor * 2 + unit) % WINDOW_COLORS.length;
+    return getWindowColorByIndex(idx);
   }
 
   return (
@@ -129,13 +167,9 @@ export default function CityPage() {
           from { transform: translateY(110%); opacity:0; }
           to   { transform: translateY(0);    opacity:1; }
         }
-        @keyframes winAppear {
-          from { opacity:0; transform:scale(0.4); }
-          to   { opacity:1; transform:scale(1); }
-        }
         @keyframes winBlink {
-          0%,90%,100% { opacity:1; }
-          95%          { opacity:0.25; }
+          0%,90%,100% { opacity:0.82; }
+          95%          { opacity:0.2; }
         }
         @keyframes fadeUp {
           from { opacity:0; transform:translateY(14px); }
@@ -145,14 +179,20 @@ export default function CityPage() {
           0%,100% { opacity:0.18; }
           50%      { opacity:0.28; }
         }
+        @keyframes floatLabel {
+          0%   { opacity:0; transform:translateX(-50%) translateY(6px); }
+          15%  { opacity:1; transform:translateX(-50%) translateY(0); }
+          75%  { opacity:1; transform:translateX(-50%) translateY(0); }
+          100% { opacity:0; transform:translateX(-50%) translateY(-8px); }
+        }
 
-        .star { animation: twinkle var(--dur) var(--dly) ease-in-out infinite; }
-        .lamp { animation: lampPulse 2.8s ease-in-out infinite; }
+        .star          { animation: twinkle var(--dur) var(--dly) ease-in-out infinite; }
+        .lamp          { animation: lampPulse 2.8s ease-in-out infinite; }
         .building-rise { animation: buildingRise 1.1s cubic-bezier(0.22,1,0.36,1) forwards; }
-        .win-appear   { animation: winAppear 0.5s ease-out forwards; }
-        .win-blink    { animation: winBlink var(--bd) var(--bly) ease-in-out infinite; }
-        .fade-up      { animation: fadeUp 0.8s ease-out both; }
-        .ground-glow  { animation: groundGlow 4s ease-in-out infinite; }
+        .win-blink     { animation: winBlink var(--bd) var(--bly) ease-in-out infinite; }
+        .fade-up       { animation: fadeUp 0.8s ease-out both; }
+        .ground-glow   { animation: groundGlow 4s ease-in-out infinite; }
+        .float-label   { animation: floatLabel 3s ease-in-out forwards; }
       `}</style>
 
       {/* Stars */}
@@ -164,7 +204,7 @@ export default function CityPage() {
             style={{
               left: `${s.x}%`, top: `${s.y}%`,
               width: s.size, height: s.size,
-              "--op": 0.25 + Math.random() * 0.55,
+              "--op": s.op,
               "--dur": `${s.dur}s`,
               "--dly": `${s.delay}s`,
             } as React.CSSProperties}
@@ -187,7 +227,7 @@ export default function CityPage() {
           still — writing
         </p>
         <button
-          onClick={() => router.push("/editor")}
+          onClick={() => router.push("/start")}
           style={{
             fontFamily: "'Crimson Pro', serif", fontWeight: 200,
             fontSize: "13px", letterSpacing: "0.1em",
@@ -209,7 +249,7 @@ export default function CityPage() {
         </button>
       </nav>
 
-      {/* Empty state copy */}
+      {/* Empty state */}
       {isEmpty && (
         <div className="relative z-10 text-center mt-16 fade-up" style={{ animationDelay: "0.5s" }}>
           <p style={{
@@ -232,53 +272,46 @@ export default function CityPage() {
       {/* City canvas */}
       <div
         className="absolute bottom-0 left-0 right-0"
-        style={{ height: "55vh", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+        style={{ height: "55vh", display: "flex", alignItems: "flex-end", justifyContent: "center", overflow: "hidden" }}
       >
-        {/* Ground line */}
-        <div
-          className="absolute bottom-0 left-0 right-0 ground-glow"
-          style={{
-            height: "1px",
-            background: "linear-gradient(90deg, transparent 0%, rgba(120,80,220,0.5) 30%, rgba(160,100,255,0.7) 50%, rgba(120,80,220,0.5) 70%, transparent 100%)",
-          }}
-        />
+        {/* Ground glow */}
+        <div className="absolute bottom-0 left-0 right-0 ground-glow" style={{
+          height: "1px",
+          background: "linear-gradient(90deg, transparent 0%, rgba(120,80,220,0.5) 30%, rgba(160,100,255,0.7) 50%, rgba(120,80,220,0.5) 70%, transparent 100%)",
+        }} />
         <div className="absolute bottom-0 left-0 right-0" style={{
           height: "40px",
           background: "linear-gradient(to top, rgba(60,20,120,0.22), transparent)",
         }} />
 
-        {/* Streetlamp — always visible */}
-        <div
-          className="absolute lamp"
-          style={{ bottom: "0px", left: "calc(50% - 80px)", zIndex: 10 }}
-        >
+        {/* Streetlamp */}
+        <div className="absolute lamp" style={{ bottom: "0px", left: "calc(50% - 80px)", zIndex: 10 }}>
           <svg width="18" height="90" viewBox="0 0 18 90" fill="none">
-            {/* Pole */}
             <rect x="8" y="20" width="2" height="70" fill="rgba(200,190,170,0.55)" />
-            {/* Arm */}
             <path d="M9 20 Q9 8 16 8" stroke="rgba(200,190,170,0.55)" strokeWidth="1.8" fill="none" />
-            {/* Lamp head */}
             <ellipse cx="16" cy="7" rx="5" ry="3" fill="rgba(255,220,100,0.9)" />
-            {/* Glow cone */}
             <polygon points="11,10 21,10 24,28 8,28" fill="rgba(255,210,80,0.07)" />
           </svg>
         </div>
 
         {/* Buildings */}
         {!loading && (
-          <div
-            style={{
-              display: "flex", alignItems: "flex-end", gap: "6px",
-              paddingBottom: "0px", paddingLeft: "16px", paddingRight: "16px",
-              flexWrap: "nowrap", overflowX: "auto",
-              maxWidth: "90vw",
-            }}
-          >
+          <div style={{
+            display: "flex", alignItems: "flex-end", gap: "6px",
+            paddingLeft: "16px", paddingRight: "16px",
+            paddingTop: "40px",       // ← 라벨 공간 확보
+            flexWrap: "nowrap",
+            overflow: "visible",      // ← hidden → visible
+            width: "100%",
+            boxSizing: "border-box",
+            justifyContent: "center"
+          }}>
             {buildings.map((b, bi) => {
               const h = getBuildingHeight(b);
               const w = GENRE_WIDTH[b.genre] ?? 50;
-              const color = GENRE_COLOR[b.genre] ?? "#b0b8c8";
+              const accentColor = GENRE_COLOR[b.genre] ?? "#c8c0b0";
               const isNew = risingId === b.id;
+              const showLabel = floatingLabel?.id === b.id;
 
               return (
                 <div
@@ -286,54 +319,76 @@ export default function CityPage() {
                   className={isNew ? "building-rise" : ""}
                   onClick={() => router.push(`/building/${b.id}`)}
                   style={{
-                    position: "relative", cursor: "pointer",
-                    flexShrink: 0,
+                    position: "relative", cursor: "pointer", flexShrink: 0,
                     transition: "transform 0.3s",
+                    // label 공간 확보
+                    marginBottom: "0",
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-4px)")}
-                  onMouseLeave={e => (e.currentTarget.style.transform = "translateY(0)")}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.transform = "translateY(-4px)";
+                    setHoveredId(b.id);
+                  }}
+                    onMouseLeave={e => {
+                    e.currentTarget.style.transform = "translateY(0)";
+                    setHoveredId(null);
+                  }}
                 >
-                  <svg
-                    width={w}
-                    height={h}
-                    viewBox={`0 0 ${w} ${h}`}
-                    style={{ display: "block" }}
-                  >
-                    {/* Building body */}
+                  {/* Floating label */}
+                  {showLabel && (
+                    <div
+                      className="float-label"
+                      style={{
+                        position: "absolute", top: "-32px", left: "50%",
+                        transform: "translateX(-50%)",
+                        whiteSpace: "nowrap", pointerEvents: "none", zIndex: 30,
+                        fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+                        fontSize: "11px", letterSpacing: "0.08em",
+                        color: "rgba(255,255,255,0.55)",
+                        background: "rgba(10,5,25,0.7)",
+                        padding: "3px 10px", borderRadius: "20px",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                      }}
+                    >
+                      {floatingLabel.text}
+                    </div>
+                  )}
+
+                  <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block" }}>
+                    {/* Body */}
                     <rect
                       x={0} y={0} width={w} height={h}
                       fill={`hsl(240,18%,${9 + bi % 4}%)`}
-                      stroke="rgba(255,255,255,0.04)"
-                      strokeWidth="0.5"
+                      stroke="rgba(255,255,255,0.04)" strokeWidth="0.5"
                     />
                     {/* Roof accent */}
-                    <rect x={0} y={0} width={w} height={2.5} fill={`${color}40`} />
+                    <rect x={0} y={0} width={w} height={2.5} fill={`${accentColor}30`} />
 
-                    {/* Windows — 2 units per floor */}
+                    {/* Windows */}
                     {Array.from({ length: b.floor_count }).map((_, floorIdx) => {
-                      const floor = b.floor_count - floorIdx; // top floor = highest number
+                      const floor = b.floor_count - floorIdx;
                       const y = 10 + floorIdx * 18;
-                      return [0, 1].map((unit) => {
-                        const x = unit === 0 ? 7 : w - 7 - 10;
-                        const lit = isWindowLit(b, floor, unit + 1);
-                        const wc = getWindowColor(b, floor, unit + 1);
+                      return [0, 1].map((unitIdx) => {
+                        const x = unitIdx === 0 ? 7 : w - 7 - 10;
+                        const unit = unitIdx + 1;
+                        const lit = isWindowLit(b, floor, unit);
+                        const wc = getWindowColor(b, floor, unit);
                         return (
-                          <g key={`${floor}-${unit}`}>
+                          <g key={`${floor}-${unitIdx}`}>
                             {lit && (
                               <rect
-                                x={x - 1} y={y - 1} width={12} height={14}
-                                fill={wc} opacity={0.12} rx={1}
+                                x={x - 2} y={y - 2} width={14} height={16}
+                                fill={wc} opacity={0.1} rx={1}
                               />
                             )}
                             <rect
                               className={lit ? "win-blink" : ""}
                               x={x} y={y} width={10} height={12}
-                              fill={lit ? wc : "rgba(255,255,255,0.04)"}
+                              fill={lit ? wc : "rgba(255,255,255,0.03)"}
                               opacity={lit ? 0.82 : 1}
                               rx={0.5}
                               style={lit ? {
-                                "--bd": `${8 + Math.random() * 10}s`,
-                                "--bly": `${Math.random() * 6}s`,
+                                "--bd": `${9 + (floor * 3 + unitIdx) % 8}s`,
+                                "--bly": `${(floor + unitIdx) % 6}s`,
                               } as React.CSSProperties : undefined}
                             />
                           </g>
@@ -342,42 +397,24 @@ export default function CityPage() {
                     })}
                   </svg>
 
-                  {/* Genre label */}
-                  <p style={{
-                    position: "absolute", bottom: "-18px", left: "50%",
-                    transform: "translateX(-50%)",
-                    fontFamily: "'Crimson Pro', serif", fontWeight: 200,
-                    fontSize: "10px", letterSpacing: "0.06em",
-                    color: `${color}99`, whiteSpace: "nowrap",
-                  }}>
-                    {GENRE_LABEL[b.genre] ?? b.genre}
-                  </p>
+                  {/* Genre label below building */}
+                  {hoveredId === b.id && (
+                    <p style={{
+                        position: "absolute", top: "-22px", left: "50%",
+                        transform: "translateX(-50%)",
+                        fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+                        fontSize: "10px", letterSpacing: "0.06em",
+                        color: `${accentColor}80`, whiteSpace: "nowrap",
+                    }}>
+                        {GENRE_LABEL[b.genre] ?? b.genre}
+                    </p>
+                    )}
                 </div>
               );
             })}
           </div>
         )}
       </div>
-
-      {/* Bottom info */}
-      {!isEmpty && !loading && (
-        <div
-          className="absolute fade-up"
-          style={{
-            bottom: "28px", left: "50%", transform: "translateX(-50%)",
-            textAlign: "center", zIndex: 20,
-            animationDelay: "0.3s",
-          }}
-        >
-          <p style={{
-            fontFamily: "'Crimson Pro', serif", fontWeight: 200,
-            fontSize: "12px", letterSpacing: "0.1em",
-            color: "rgba(255,255,255,0.22)",
-          }}>
-            {buildings.reduce((a, b) => a + b.writings.length, 0)}편의 글이 이 도시에 살고 있습니다
-          </p>
-        </div>
-      )}
     </main>
   );
 }
