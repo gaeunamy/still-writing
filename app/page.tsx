@@ -413,7 +413,7 @@ export default function Home() {
           }}
         >
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", justifyContent: "center" }}>
-            <Link href="/start" className="btn-primary">
+            <Link href="/city" className="btn-primary">
               내 방으로 가기
             </Link>
             <Link href="/explore" className="btn-secondary">
