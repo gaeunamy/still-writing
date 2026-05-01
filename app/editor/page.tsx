@@ -50,29 +50,38 @@ async function assignBuildingSlot(genre: string): Promise<{
 
     const occupied = new Set((writings ?? []).map((w) => `${w.floor}-${w.unit}`));
 
-    for (let floor = 1; floor <= FLOORS_PER_BUILDING; floor++) {
+    const empty: { floor: number; unit: number }[] = [];
+    for (let floor = 1; floor <= building.floor_count; floor++) {
       for (let unit = 1; unit <= UNITS_PER_FLOOR; unit++) {
         if (!occupied.has(`${floor}-${unit}`)) {
-          return { buildingId: building.id, floor, unit, isNew: false };
+          empty.push({ floor, unit });
         }
       }
+    }
+    if (empty.length > 0) {
+      const pick = empty[Math.floor(Math.random() * empty.length)];
+      return { buildingId: building.id, floor: pick.floor, unit: pick.unit, isNew: false };
     }
   }
 
   // 빈 슬롯 없음 → 새 건물 생성
-  const genreNames: Record<string, string> = { 시: "시집", 소설: "소설관", 일기: "일기탑" };
+const genreNames: Record<string, string> = { 시: "시집", 소설: "소설관", 일기: "일기탑" };
   const count = (buildings ?? []).length;
   const name = `${genreNames[genre] ?? genre} ${count + 1}호`;
 
+  const randomFloors = Math.floor(Math.random() * 5) + 4; // 4~8층 랜덤
+
   const { data: newBuilding, error } = await supabase
     .from("buildings")
-    .insert({ genre, name, floor_count: FLOORS_PER_BUILDING, unit_per_floor: UNITS_PER_FLOOR })
+    .insert({ genre, name, floor_count: randomFloors, unit_per_floor: UNITS_PER_FLOOR })
     .select()
     .single();
 
   if (error || !newBuilding) throw new Error("건물 생성 실패");
 
-  return { buildingId: newBuilding.id, floor: 1, unit: 1, isNew: true };
+  // 새 건물 1층도 랜덤 유닛
+  const firstUnit = Math.random() < 0.5 ? 1 : 2;
+  return { buildingId: newBuilding.id, floor: 1, unit: firstUnit, isNew: true };
 }
 
 export default function EditorPage() {
