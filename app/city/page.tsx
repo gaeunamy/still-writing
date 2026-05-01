@@ -34,12 +34,12 @@ type Star = {
 };
 
 const WINDOW_COLORS = [
-  "#ffd97d", // warm yellow
-  "#ffb347", // amber
-  "#a8daff", // cool blue
-  "#ffa8c5", // soft pink
-  "#b8f0b8", // mint
-  "#e8d5ff", // lavender
+  "#ffd97d",
+  "#ffb347",
+  "#a8daff",
+  "#ffa8c5",
+  "#b8f0b8",
+  "#e8d5ff",
 ];
 
 const GENRE_COLOR: Record<string, string> = {
@@ -60,9 +60,9 @@ const GENRE_LABEL: Record<string, string> = {
   일기: "일기탑",
 };
 
-// 건물+층+유닛 기반으로 일관된 창문 색상 (랜덤 아님)
-function getWindowColorByIndex(index: number) {
-  return WINDOW_COLORS[index % WINDOW_COLORS.length];
+function getWindowColor(floor: number, unit: number, emotionColor?: string | null) {
+  if (emotionColor) return emotionColor;
+  return WINDOW_COLORS[(floor * 2 + unit) % WINDOW_COLORS.length];
 }
 
 export default function CityPage() {
@@ -115,14 +115,10 @@ export default function CityPage() {
     setBuildings(enriched);
     setLoading(false);
 
-    // 가장 최근 건물에 floating label 표시
     if (enriched.length > 0) {
       const latest = enriched[enriched.length - 1];
       const total = enriched.reduce((a, b) => a + b.writings.length, 0);
-      setFloatingLabel({
-        id: latest.id,
-        text: `${total}편의 글이 살고 있습니다`,
-      });
+      setFloatingLabel({ id: latest.id, text: `${total}편의 글이 살고 있습니다` });
       setTimeout(() => setFloatingLabel(null), 3000);
     }
   }
@@ -137,19 +133,17 @@ export default function CityPage() {
     return b.writings.some((w) => w.floor === floor && w.unit === unit);
   }
 
-  function getWindowColor(b: Building, floor: number, unit: number) {
+  function getWritingColor(b: Building, floor: number, unit: number) {
     const w = b.writings.find((wr) => wr.floor === floor && wr.unit === unit);
-    if (w?.emotion_color) return w.emotion_color;
-    // 위치 기반으로 일관된 색상
-    const idx = (floor * 2 + unit) % WINDOW_COLORS.length;
-    return getWindowColorByIndex(idx);
+    return getWindowColor(floor, unit, w?.emotion_color);
   }
 
   return (
     <main
-      className="relative min-h-screen overflow-hidden"
+      className="relative min-h-screen"
       style={{
         background: "linear-gradient(180deg, #03010a 0%, #080318 45%, #100828 100%)",
+        overflow: "hidden",
       }}
     >
       <style>{`
@@ -168,8 +162,8 @@ export default function CityPage() {
           to   { transform: translateY(0);    opacity:1; }
         }
         @keyframes winBlink {
-          0%,90%,100% { opacity:0.82; }
-          95%          { opacity:0.2; }
+          0%,88%,100% { opacity:0.85; }
+          93%          { opacity:0.15; }
         }
         @keyframes fadeUp {
           from { opacity:0; transform:translateY(14px); }
@@ -185,11 +179,19 @@ export default function CityPage() {
           75%  { opacity:1; transform:translateX(-50%) translateY(0); }
           100% { opacity:0; transform:translateX(-50%) translateY(-8px); }
         }
+        @keyframes winGlow {
+          0%,100% { box-shadow: 0 0 4px 1px var(--wc); }
+          50%      { box-shadow: 0 0 10px 3px var(--wc); }
+        }
 
         .star          { animation: twinkle var(--dur) var(--dly) ease-in-out infinite; }
         .lamp          { animation: lampPulse 2.8s ease-in-out infinite; }
         .building-rise { animation: buildingRise 1.1s cubic-bezier(0.22,1,0.36,1) forwards; }
-        .win-blink     { animation: winBlink var(--bd) var(--bly) ease-in-out infinite; }
+        .win-lit       {
+          animation:
+            winBlink var(--bd) var(--bly) ease-in-out infinite,
+            winGlow var(--bd) var(--bly) ease-in-out infinite;
+        }
         .fade-up       { animation: fadeUp 0.8s ease-out both; }
         .ground-glow   { animation: groundGlow 4s ease-in-out infinite; }
         .float-label   { animation: floatLabel 3s ease-in-out forwards; }
@@ -272,7 +274,7 @@ export default function CityPage() {
       {/* City canvas */}
       <div
         className="absolute bottom-0 left-0 right-0"
-        style={{ height: "55vh", display: "flex", alignItems: "flex-end", justifyContent: "center", overflow: "hidden" }}
+        style={{ height: "58vh", display: "flex", alignItems: "flex-end", justifyContent: "center", overflow: "hidden" }}
       >
         {/* Ground glow */}
         <div className="absolute bottom-0 left-0 right-0 ground-glow" style={{
@@ -297,118 +299,119 @@ export default function CityPage() {
         {/* Buildings */}
         {!loading && (
           <div style={{
-            display: "flex", alignItems: "flex-end", gap: "6px",
+            display: "flex", alignItems: "flex-end",
+            gap: "6px",
             paddingLeft: "16px", paddingRight: "16px",
-            paddingTop: "40px",       // ← 라벨 공간 확보
+            paddingTop: "40px",
             flexWrap: "nowrap",
-            overflow: "visible",      // ← hidden → visible
+            overflow: "visible",
             width: "100%",
             boxSizing: "border-box",
-            justifyContent: "center"
+            justifyContent: "center",
           }}>
             {buildings.map((b, bi) => {
-              const h = getBuildingHeight(b);
-              const w = GENRE_WIDTH[b.genre] ?? 50;
+              const bh = getBuildingHeight(b);
+              const bw = GENRE_WIDTH[b.genre] ?? 50;
               const accentColor = GENRE_COLOR[b.genre] ?? "#c8c0b0";
               const isNew = risingId === b.id;
-              const showLabel = floatingLabel?.id === b.id;
+              const showFloat = floatingLabel?.id === b.id;
+              const isHovered = hoveredId === b.id;
 
               return (
                 <div
                   key={b.id}
                   className={isNew ? "building-rise" : ""}
                   onClick={() => router.push(`/building/${b.id}`)}
+                  onMouseEnter={() => setHoveredId(b.id)}
+                  onMouseLeave={() => setHoveredId(null)}
                   style={{
-                    position: "relative", cursor: "pointer", flexShrink: 0,
-                    transition: "transform 0.3s",
-                    // label 공간 확보
-                    marginBottom: "0",
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.transform = "translateY(-4px)";
-                    setHoveredId(b.id);
-                  }}
-                    onMouseLeave={e => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    setHoveredId(null);
+                    position: "relative",
+                    cursor: "pointer",
+                    flexShrink: 0,
+                    width: bw,
+                    height: bh,
+                    transform: isHovered ? "translateY(-4px)" : "translateY(0)",
+                    transition: "transform 0.3s ease",
                   }}
                 >
-                  {/* Floating label */}
-                  {showLabel && (
-                    <div
-                      className="float-label"
-                      style={{
-                        position: "absolute", top: "-32px", left: "50%",
-                        transform: "translateX(-50%)",
-                        whiteSpace: "nowrap", pointerEvents: "none", zIndex: 30,
-                        fontFamily: "'Crimson Pro', serif", fontWeight: 200,
-                        fontSize: "11px", letterSpacing: "0.08em",
-                        color: "rgba(255,255,255,0.55)",
-                        background: "rgba(10,5,25,0.7)",
-                        padding: "3px 10px", borderRadius: "20px",
-                        border: "1px solid rgba(255,255,255,0.08)",
-                      }}
-                    >
-                      {floatingLabel.text}
+                  {/* Floating count label */}
+                  {showFloat && (
+                    <div className="float-label" style={{
+                      position: "absolute", top: "-32px", left: "50%",
+                      whiteSpace: "nowrap", pointerEvents: "none", zIndex: 30,
+                      fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+                      fontSize: "11px", letterSpacing: "0.08em",
+                      color: "rgba(255,255,255,0.55)",
+                      background: "rgba(10,5,25,0.7)",
+                      padding: "3px 10px", borderRadius: "20px",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                    }}>
+                      {floatingLabel!.text}
                     </div>
                   )}
 
-                  <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block" }}>
-                    {/* Body */}
-                    <rect
-                      x={0} y={0} width={w} height={h}
-                      fill={`hsl(240,18%,${9 + bi % 4}%)`}
-                      stroke="rgba(255,255,255,0.04)" strokeWidth="0.5"
-                    />
-                    {/* Roof accent */}
-                    <rect x={0} y={0} width={w} height={2.5} fill={`${accentColor}30`} />
-
-                    {/* Windows */}
-                    {Array.from({ length: b.floor_count }).map((_, floorIdx) => {
-                      const floor = b.floor_count - floorIdx;
-                      const y = 10 + floorIdx * 18;
-                      return [0, 1].map((unitIdx) => {
-                        const x = unitIdx === 0 ? 7 : w - 7 - 10;
-                        const unit = unitIdx + 1;
-                        const lit = isWindowLit(b, floor, unit);
-                        const wc = getWindowColor(b, floor, unit);
-                        return (
-                          <g key={`${floor}-${unitIdx}`}>
-                            {lit && (
-                              <rect
-                                x={x - 2} y={y - 2} width={14} height={16}
-                                fill={wc} opacity={0.1} rx={1}
-                              />
-                            )}
-                            <rect
-                              className={lit ? "win-blink" : ""}
-                              x={x} y={y} width={10} height={12}
-                              fill={lit ? wc : "rgba(255,255,255,0.03)"}
-                              opacity={lit ? 0.82 : 1}
-                              rx={0.5}
-                              style={lit ? {
-                                "--bd": `${9 + (floor * 3 + unitIdx) % 8}s`,
-                                "--bly": `${(floor + unitIdx) % 6}s`,
-                              } as React.CSSProperties : undefined}
-                            />
-                          </g>
-                        );
-                      });
-                    })}
-                  </svg>
-
-                  {/* Genre label below building */}
-                  {hoveredId === b.id && (
-                    <p style={{
-                        position: "absolute", top: "-22px", left: "50%",
-                        transform: "translateX(-50%)",
-                        fontFamily: "'Crimson Pro', serif", fontWeight: 200,
-                        fontSize: "10px", letterSpacing: "0.06em",
-                        color: `${accentColor}80`, whiteSpace: "nowrap",
+                  {/* Hover genre label */}
+                  {isHovered && (
+                    <div style={{
+                      position: "absolute", top: "-22px", left: "50%",
+                      transform: "translateX(-50%)",
+                      whiteSpace: "nowrap", pointerEvents: "none", zIndex: 30,
+                      fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+                      fontSize: "10px", letterSpacing: "0.08em",
+                      color: `${accentColor}cc`,
                     }}>
-                        {GENRE_LABEL[b.genre] ?? b.genre}
-                    </p>
-                    )}
+                      {GENRE_LABEL[b.genre] ?? b.genre}
+                    </div>
+                  )}
+
+                  {/* Building body */}
+                  <div style={{
+                    position: "absolute", inset: 0,
+                    background: `hsl(240,18%,${9 + bi % 4}%)`,
+                    border: "0.5px solid rgba(255,255,255,0.04)",
+                  }} />
+
+                  {/* Roof accent */}
+                  <div style={{
+                    position: "absolute", top: 0, left: 0, right: 0, height: "2.5px",
+                    background: `${accentColor}30`,
+                  }} />
+
+                  {/* Windows grid */}
+                  {Array.from({ length: b.floor_count }).map((_, floorIdx) => {
+                    const floor = b.floor_count - floorIdx;
+                    const topPx = 10 + floorIdx * 18;
+                    return [0, 1].map((unitIdx) => {
+                      const unit = unitIdx + 1;
+                      const leftPx = unitIdx === 0 ? 7 : bw - 17;
+                      const lit = isWindowLit(b, floor, unit);
+                      const wc = getWritingColor(b, floor, unit);
+                      const bd = `${9 + (floor * 3 + unitIdx) % 8}s`;
+                      const bly = `${(floor + unitIdx) % 6}s`;
+
+                      return (
+                        <div
+                          key={`${floor}-${unitIdx}`}
+                          className={lit ? "win-lit" : ""}
+                          style={{
+                            position: "absolute",
+                            top: topPx,
+                            left: leftPx,
+                            width: 10,
+                            height: 12,
+                            borderRadius: 1,
+                            background: lit ? wc : "rgba(255,255,255,0.03)",
+                            opacity: lit ? 0.85 : 1,
+                            ...(lit ? {
+                              "--wc": wc + "88",
+                              "--bd": bd,
+                              "--bly": bly,
+                            } as React.CSSProperties : {}),
+                          }}
+                        />
+                      );
+                    });
+                  })}
                 </div>
               );
             })}
