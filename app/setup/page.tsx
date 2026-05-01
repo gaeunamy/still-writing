@@ -6,135 +6,177 @@ import { useRouter } from "next/navigation";
 const poemSpeakers = ["나", "익명의 화자", "과거의 나"];
 const poemMoods = ["고요한", "쓸쓸한", "몽환적인", "따뜻한"];
 const poemImages = ["새벽", "여름", "바다", "비", "기억"];
-const lengths = ["짧게", "적당히", "길게"];
 
 const novelViews = ["1인칭", "3인칭", "전지적 작가 시점"];
 const novelSettings = ["도시", "바다", "학교", "기억 속 장소"];
 const novelEndings = ["열린 결말", "쓸쓸한 결말", "따뜻한 결말"];
 
+const diaryMoods = ["고요한", "쓸쓸한", "따뜻한", "기쁜", "우울한", "차분한"];
+
+const lengths = ["짧게", "적당히", "길게"];
+
 export default function SetupPage() {
   const router = useRouter();
-
   const [genre, setGenre] = useState("");
 
   const [selectedSpeaker, setSelectedSpeaker] = useState("");
   const [selectedMood, setSelectedMood] = useState("");
   const [selectedImage, setSelectedImage] = useState("");
-
   const [selectedView, setSelectedView] = useState("");
   const [selectedSetting, setSelectedSetting] = useState("");
   const [selectedEnding, setSelectedEnding] = useState("");
-
   const [selectedLength, setSelectedLength] = useState("");
 
   useEffect(() => {
-    const savedGenre = localStorage.getItem("selectedGenre");
-
-    if (savedGenre) {
-      setGenre(savedGenre);
-    }
+    const g = localStorage.getItem("selectedGenre");
+    if (!g) { router.push("/start"); return; }
+    setGenre(g);
   }, []);
 
   const handleNext = () => {
-    localStorage.setItem(
-      "writingSetup",
-      JSON.stringify({
-        genre,
-        speaker: selectedSpeaker,
-        mood: selectedMood,
-        image: selectedImage,
-        view: selectedView,
-        setting: selectedSetting,
-        ending: selectedEnding,
-        length: selectedLength,
-      })
-    );
-
+    localStorage.setItem("writingSetup", JSON.stringify({
+      genre,
+      speaker: selectedSpeaker,
+      mood: selectedMood,
+      image: selectedImage,
+      view: selectedView,
+      setting: selectedSetting,
+      ending: selectedEnding,
+      length: selectedLength,
+    }));
     router.push("/editor");
   };
 
   return (
-    <main className="min-h-screen bg-black text-white px-6 py-20">
-      <div className="max-w-5xl mx-auto">
+    <main
+      className="relative min-h-screen px-6 py-16"
+      style={{
+        background: "linear-gradient(180deg, #03010a 0%, #080318 55%, #100828 100%)",
+      }}
+    >
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;1,300&family=Crimson+Pro:wght@200;300&display=swap');
+        @keyframes fadeUp {
+          from { opacity:0; transform:translateY(14px); }
+          to   { opacity:1; transform:translateY(0); }
+        }
+        .fade-up { animation: fadeUp 0.7s ease-out both; }
+        .chip {
+          font-family: 'Crimson Pro', serif;
+          font-weight: 200;
+          font-size: 13px;
+          letter-spacing: 0.06em;
+          padding: 8px 20px;
+          border-radius: 100px;
+          border: 1px solid rgba(255,255,255,0.1);
+          background: transparent;
+          color: rgba(255,255,255,0.5);
+          cursor: pointer;
+          transition: all 0.35s ease;
+          white-space: nowrap;
+        }
+        .chip:hover {
+          border-color: rgba(255,255,255,0.3);
+          color: rgba(255,255,255,0.85);
+        }
+        .chip-active {
+          border-color: rgba(255,255,255,0.7) !important;
+          background: rgba(255,255,255,0.06) !important;
+          color: rgba(255,255,255,0.95) !important;
+        }
+      `}</style>
 
-        <p className="text-xs tracking-[0.4em] uppercase opacity-50 mb-6">
-          writing setup
+      <div className="max-w-3xl mx-auto">
+        <button
+          onClick={() => router.push("/start")}
+          className="fade-up"
+          style={{
+            fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+            fontSize: "11px", letterSpacing: "0.38em", textTransform: "uppercase",
+            color: "rgba(255,255,255,0.28)", background: "none", border: "none",
+            cursor: "pointer", transition: "color 0.3s", marginBottom: "32px",
+            display: "block",
+          }}
+          onMouseEnter={e => (e.currentTarget.style.color = "rgba(255,255,255,0.6)")}
+          onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.28)")}
+        >
+          ← 장르 선택
+        </button>
+
+        <p
+          className="fade-up"
+          style={{
+            fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+            fontSize: "11px", letterSpacing: "0.42em", textTransform: "uppercase",
+            color: "rgba(255,255,255,0.3)", marginBottom: "16px",
+            animationDelay: "0.05s",
+          }}
+        >
+          writing setup · {genre}
         </p>
 
-        <h1 className="text-3xl md:text-5xl font-light leading-relaxed mb-6">
-          어떤 문장을 만나고 싶나요
+        <h1
+          className="fade-up"
+          style={{
+            fontFamily: "'Cormorant Garamond', serif", fontWeight: 300,
+            fontSize: "clamp(24px, 3.5vw, 42px)", lineHeight: 1.35,
+            color: "rgba(255,255,255,0.88)", marginBottom: "48px",
+            animationDelay: "0.1s",
+          }}
+        >
+          어떤 분위기로 쓸까요
         </h1>
 
-        <p className="opacity-50 mb-14">
-          선택한 장르: {genre || "불러오는 중..."}
-        </p>
+        <div className="space-y-10">
 
-        <div className="space-y-12">
-
+          {/* 시 옵션 */}
           {genre === "시" && (
             <>
-              <Section
-                title="화자"
-                items={poemSpeakers}
-                selected={selectedSpeaker}
-                setSelected={setSelectedSpeaker}
-              />
-
-              <Section
-                title="정서"
-                items={poemMoods}
-                selected={selectedMood}
-                setSelected={setSelectedMood}
-              />
-
-              <Section
-                title="이미지"
-                items={poemImages}
-                selected={selectedImage}
-                setSelected={setSelectedImage}
-              />
+              <Section title="화자" items={poemSpeakers} selected={selectedSpeaker} onSelect={setSelectedSpeaker} delay="0.15s" />
+              <Section title="정서" items={poemMoods} selected={selectedMood} onSelect={setSelectedMood} delay="0.2s" />
+              <Section title="이미지" items={poemImages} selected={selectedImage} onSelect={setSelectedImage} delay="0.25s" />
             </>
           )}
 
+          {/* 소설 옵션 */}
           {genre === "소설" && (
             <>
-              <Section
-                title="시점"
-                items={novelViews}
-                selected={selectedView}
-                setSelected={setSelectedView}
-              />
-
-              <Section
-                title="배경"
-                items={novelSettings}
-                selected={selectedSetting}
-                setSelected={setSelectedSetting}
-              />
-
-              <Section
-                title="결말 분위기"
-                items={novelEndings}
-                selected={selectedEnding}
-                setSelected={setSelectedEnding}
-              />
+              <Section title="시점" items={novelViews} selected={selectedView} onSelect={setSelectedView} delay="0.15s" />
+              <Section title="배경" items={novelSettings} selected={selectedSetting} onSelect={setSelectedSetting} delay="0.2s" />
+              <Section title="결말 분위기" items={novelEndings} selected={selectedEnding} onSelect={setSelectedEnding} delay="0.25s" />
             </>
           )}
 
-          <Section
-            title="길이"
-            items={lengths}
-            selected={selectedLength}
-            setSelected={setSelectedLength}
-          />
+          {/* 일기 옵션 */}
+          {genre === "일기" && (
+            <Section title="오늘의 감정" items={diaryMoods} selected={selectedMood} onSelect={setSelectedMood} delay="0.15s" />
+          )}
+
+          <Section title="길이" items={lengths} selected={selectedLength} onSelect={setSelectedLength} delay="0.3s" />
         </div>
 
-        <div className="mt-16 text-center">
+        <div className="fade-up text-center" style={{ marginTop: "52px", animationDelay: "0.4s" }}>
           <button
             onClick={handleNext}
-            className="px-8 py-4 rounded-full border border-white/20 hover:bg-white hover:text-black transition duration-500"
+            style={{
+              fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+              fontSize: "15px", letterSpacing: "0.12em",
+              padding: "13px 40px", borderRadius: "100px",
+              border: "1px solid rgba(255,255,255,0.2)",
+              background: "rgba(255,255,255,0.03)",
+              color: "rgba(255,255,255,0.85)",
+              cursor: "pointer", transition: "all 0.5s ease",
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.borderColor = "rgba(255,255,255,0.45)";
+              e.currentTarget.style.background = "rgba(255,255,255,0.07)";
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
+              e.currentTarget.style.background = "rgba(255,255,255,0.03)";
+            }}
           >
-            문장 쓰러 가기
+            글 쓰러 가기
           </button>
         </div>
       </div>
@@ -143,33 +185,29 @@ export default function SetupPage() {
 }
 
 function Section({
-  title,
-  items,
-  selected,
-  setSelected,
+  title, items, selected, onSelect, delay,
 }: {
   title: string;
   items: string[];
   selected: string;
-  setSelected: (value: string) => void;
+  onSelect: (v: string) => void;
+  delay?: string;
 }) {
   return (
-    <div>
-      <h2 className="text-lg mb-4 opacity-80">
+    <div className="fade-up" style={{ animationDelay: delay }}>
+      <p style={{
+        fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+        fontSize: "11px", letterSpacing: "0.3em", textTransform: "uppercase",
+        color: "rgba(255,255,255,0.3)", marginBottom: "14px",
+      }}>
         {title}
-      </h2>
-
-      <div className="flex flex-wrap gap-3">
+      </p>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
         {items.map((item) => (
           <button
             key={item}
-            onClick={() => setSelected(item)}
-            className={`px-5 py-2 rounded-full border transition
-              ${
-                selected === item
-                  ? "border-white bg-white text-black"
-                  : "border-white/15 hover:border-white/40 hover:bg-white/5"
-              }`}
+            className={`chip ${selected === item ? "chip-active" : ""}`}
+            onClick={() => onSelect(item)}
           >
             {item}
           </button>
