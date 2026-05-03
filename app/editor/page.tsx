@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import { Toast, useToast } from "../components/Toast";
+import AuthGuard from "../components/AuthGuard";
 
 type WritingSetup = {
   genre: string;
@@ -37,7 +38,7 @@ const CHAR_LIMITS: Record<string, number> = {
 const FLOORS_PER_BUILDING = 6;
 const UNITS_PER_FLOOR = 2;
 
-async function assignBuildingSlot(genre: string): Promise<{
+async function assignBuildingSlot(genre: string, userId: string | null): Promise<{
   buildingId: string;
   floor: number;
   unit: number;
@@ -77,7 +78,7 @@ async function assignBuildingSlot(genre: string): Promise<{
 
   const { data: newBuilding, error } = await supabase
     .from("buildings")
-    .insert({ genre, name, floor_count: randomFloors, unit_per_floor: UNITS_PER_FLOOR })
+    .insert({ genre, name, floor_count: randomFloors, unit_per_floor: UNITS_PER_FLOOR, user_id: userId })
     .select()
     .single();
 
@@ -175,6 +176,8 @@ export default function EditorPage() {
     setSaving(true);
     setSaveMode(mode);
 
+    const { data: { user } } = await supabase.auth.getUser();
+
     try {
       if (mode === "future") {
         const { error } = await supabase.from("writings").insert({
@@ -185,6 +188,7 @@ export default function EditorPage() {
           is_public: false,
           emotion_color: moodColor,
           open_at: openAt ? new Date(openAt).toISOString() : null,
+          user_id: user?.id ?? null,
         });
         if (error) {
           console.error("Supabase insert error:", JSON.stringify(error));
@@ -192,7 +196,7 @@ export default function EditorPage() {
         }
       } else {
         const genre = setup.genre || "일기";
-        const { buildingId, floor, unit, isNew } = await assignBuildingSlot(genre);
+        const { buildingId, floor, unit, isNew } = await assignBuildingSlot(genre, user?.id ?? null);
         setIsNewBuilding(isNew);
 
         const { error } = await supabase.from("writings").insert({
@@ -205,6 +209,7 @@ export default function EditorPage() {
           building_id: buildingId,
           floor,
           unit,
+          user_id: user?.id ?? null,
         });
         if (error) {
           console.error("Supabase insert error:", JSON.stringify(error));
@@ -231,313 +236,315 @@ export default function EditorPage() {
   return (
     <>
     {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
-    <main
-      className="min-h-screen text-white px-6 py-14 transition-all duration-1000"
-      style={{
-        background: `radial-gradient(ellipse at 65% 0%, ${moodColor}15 0%, transparent 55%), linear-gradient(180deg, #03010a 0%, #0a0520 100%)`,
-      }}
-    >
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;1,300&family=Crimson+Pro:wght@200;300&display=swap');
-        @keyframes fadeIn { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes paperIn { from{opacity:0;transform:scaleY(0.97) translateY(10px)} to{opacity:1;transform:scaleY(1) translateY(0)} }
-        @keyframes savePublic  { 0%{opacity:1;transform:scale(1)} 100%{opacity:0;transform:scale(0.98) translateY(-24px)} }
-        @keyframes savePrivate { 0%{opacity:1;transform:translateY(0)} 100%{opacity:0;transform:translateY(32px)} }
-        @keyframes saveFuture  { 0%{opacity:1;transform:translateY(0) rotate(0deg)} 100%{opacity:0;transform:translateY(-70px) rotate(-10deg)} }
-        @keyframes lampPulse   { 0%,100%{box-shadow:0 0 10px 2px rgba(255,215,100,0.18)} 50%{box-shadow:0 0 22px 5px rgba(255,215,100,0.36)} }
-        @keyframes modalIn { from{opacity:0;transform:translateY(20px) scale(0.98)} to{opacity:1;transform:translateY(0) scale(1)} }
-        .page-in  { animation: fadeIn  0.8s ease-out both; }
-        .paper-in { animation: paperIn 0.85s 0.2s ease-out both; }
-        .lamp-btn { animation: lampPulse 3s ease-in-out infinite; }
-        .save-public  { animation: savePublic  2.2s ease-in-out forwards; }
-        .save-private { animation: savePrivate 2.2s ease-in-out forwards; }
-        .save-future  { animation: saveFuture  2.2s ease-in-out forwards; }
-        .modal-in { animation: modalIn 0.45s ease-out both; }
-        textarea {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 18px; font-weight: 300; line-height: 1.95;
-          caret-color: ${moodColor};
-        }
-        textarea::placeholder { color: rgba(255,255,255,0.18); }
-        textarea:focus { outline: none; }
-        .save-btn {
-          font-family: 'Crimson Pro', serif; font-weight: 200;
-          font-size: 13.5px; letter-spacing: 0.07em;
-          padding: 10px 22px; border-radius: 100px;
-          border: 1px solid rgba(255,255,255,0.11);
-          background: transparent; color: rgba(255,255,255,0.6);
-          cursor: pointer; transition: all 0.4s ease; white-space: nowrap;
-        }
-        .save-btn:hover { border-color:rgba(255,255,255,0.32); color:rgba(255,255,255,0.92); background:rgba(255,255,255,0.03); }
-        .save-btn:disabled { opacity:0.4; cursor:default; }
-        .date-preset {
-          font-family: 'Crimson Pro', serif; font-weight: 200;
-          font-size: 13px; letter-spacing: 0.06em;
-          padding: 9px 20px; border-radius: 100px;
-          border: 1px solid rgba(255,255,255,0.1);
-          background: transparent; color: rgba(255,255,255,0.55);
-          cursor: pointer; transition: all 0.3s;
-        }
-        .date-preset:hover { border-color:rgba(255,255,255,0.32); color:rgba(255,255,255,0.9); }
-        .date-preset-active {
-          border-color: rgba(255,255,255,0.6) !important;
-          background: rgba(255,255,255,0.06) !important;
-          color: rgba(255,255,255,0.95) !important;
-        }
-      `}</style>
-
-      <div className="page-in max-w-3xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-10">
-          <button
-            onClick={() => router.push("/city")}
-            style={{
-              fontFamily: "'Crimson Pro', serif", fontWeight: 200,
-              fontSize: "11px", letterSpacing: "0.38em", textTransform: "uppercase",
-              color: "rgba(255,255,255,0.28)", background: "none", border: "none",
-              cursor: "pointer", transition: "color 0.3s",
-            }}
-            onMouseEnter={e => (e.currentTarget.style.color = "rgba(255,255,255,0.6)")}
-            onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.28)")}
-          >
-            ← 도시로
-          </button>
-
-          <button
-            onClick={handleGenerate}
-            disabled={loading}
-            className="lamp-btn"
-            style={{
-              display: "flex", alignItems: "center", gap: "8px",
-              padding: "8px 18px", borderRadius: "100px",
-              border: `1px solid ${moodColor}35`,
-              background: `${moodColor}0a`,
-              color: moodColor,
-              fontFamily: "'Crimson Pro', serif", fontWeight: 200,
-              fontSize: "13px", letterSpacing: "0.06em",
-              cursor: loading ? "default" : "pointer",
-              transition: "all 0.4s",
-            }}
-          >
-            <span>🕯</span>
-            {loading ? "생각 중..." : "AI 도움 받기"}
-          </button>
-        </div>
-
-        {/* Paper */}
-        <div
-          className={`paper-in ${saved ? `save-${saveMode}` : ""}`}
+      <AuthGuard>
+        <main
+          className="min-h-screen text-white px-6 py-14 transition-all duration-1000"
           style={{
-            background: "rgba(255,255,255,0.028)",
-            border: "1px solid rgba(255,255,255,0.065)",
-            borderRadius: "22px", padding: "38px 42px",
-            backdropFilter: "blur(10px)",
+            background: `radial-gradient(ellipse at 65% 0%, ${moodColor}15 0%, transparent 55%), linear-gradient(180deg, #03010a 0%, #0a0520 100%)`,
           }}
         >
-          <input
-            type="text"
-            placeholder="제목"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            style={{
-              width: "100%", background: "transparent", border: "none",
-              borderBottom: "1px solid rgba(255,255,255,0.07)",
-              paddingBottom: "14px", marginBottom: "26px",
-              fontFamily: "'Cormorant Garamond', serif", fontWeight: 300,
-              fontSize: "24px", color: "rgba(255,255,255,0.82)", outline: "none",
-            }}
-          />
-          <textarea
-            placeholder="오늘은 어떤 문장을 쓰고 싶나요"
-            value={content}
-            maxLength={charLimit}
-            onChange={(e) => setContent(e.target.value)}
-            style={{
-              width: "100%", minHeight: "380px",
-              background: "transparent", border: "none",
-              color: "rgba(255,255,255,0.8)", resize: "none",
-            }}
-          />
-          {/* 글자 수 카운터 */}
-          <p style={{
-            textAlign: "right", marginTop: "8px",
-            fontFamily: "'Crimson Pro', serif", fontWeight: 200,
-            fontSize: "12px", letterSpacing: "0.04em",
-            color: content.length >= charLimit
-              ? "rgba(255,120,120,0.7)"
-              : "rgba(255,255,255,0.2)",
-          }}>
-            {content.length} / {charLimit}
-          </p>
-        </div>
+          <style>{`
+            @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;1,300&family=Crimson+Pro:wght@200;300&display=swap');
+            @keyframes fadeIn { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+            @keyframes paperIn { from{opacity:0;transform:scaleY(0.97) translateY(10px)} to{opacity:1;transform:scaleY(1) translateY(0)} }
+            @keyframes savePublic  { 0%{opacity:1;transform:scale(1)} 100%{opacity:0;transform:scale(0.98) translateY(-24px)} }
+            @keyframes savePrivate { 0%{opacity:1;transform:translateY(0)} 100%{opacity:0;transform:translateY(32px)} }
+            @keyframes saveFuture  { 0%{opacity:1;transform:translateY(0) rotate(0deg)} 100%{opacity:0;transform:translateY(-70px) rotate(-10deg)} }
+            @keyframes lampPulse   { 0%,100%{box-shadow:0 0 10px 2px rgba(255,215,100,0.18)} 50%{box-shadow:0 0 22px 5px rgba(255,215,100,0.36)} }
+            @keyframes modalIn { from{opacity:0;transform:translateY(20px) scale(0.98)} to{opacity:1;transform:translateY(0) scale(1)} }
+            .page-in  { animation: fadeIn  0.8s ease-out both; }
+            .paper-in { animation: paperIn 0.85s 0.2s ease-out both; }
+            .lamp-btn { animation: lampPulse 3s ease-in-out infinite; }
+            .save-public  { animation: savePublic  2.2s ease-in-out forwards; }
+            .save-private { animation: savePrivate 2.2s ease-in-out forwards; }
+            .save-future  { animation: saveFuture  2.2s ease-in-out forwards; }
+            .modal-in { animation: modalIn 0.45s ease-out both; }
+            textarea {
+              font-family: 'Cormorant Garamond', serif;
+              font-size: 18px; font-weight: 300; line-height: 1.95;
+              caret-color: ${moodColor};
+            }
+            textarea::placeholder { color: rgba(255,255,255,0.18); }
+            textarea:focus { outline: none; }
+            .save-btn {
+              font-family: 'Crimson Pro', serif; font-weight: 200;
+              font-size: 13.5px; letter-spacing: 0.07em;
+              padding: 10px 22px; border-radius: 100px;
+              border: 1px solid rgba(255,255,255,0.11);
+              background: transparent; color: rgba(255,255,255,0.6);
+              cursor: pointer; transition: all 0.4s ease; white-space: nowrap;
+            }
+            .save-btn:hover { border-color:rgba(255,255,255,0.32); color:rgba(255,255,255,0.92); background:rgba(255,255,255,0.03); }
+            .save-btn:disabled { opacity:0.4; cursor:default; }
+            .date-preset {
+              font-family: 'Crimson Pro', serif; font-weight: 200;
+              font-size: 13px; letter-spacing: 0.06em;
+              padding: 9px 20px; border-radius: 100px;
+              border: 1px solid rgba(255,255,255,0.1);
+              background: transparent; color: rgba(255,255,255,0.55);
+              cursor: pointer; transition: all 0.3s;
+            }
+            .date-preset:hover { border-color:rgba(255,255,255,0.32); color:rgba(255,255,255,0.9); }
+            .date-preset-active {
+              border-color: rgba(255,255,255,0.6) !important;
+              background: rgba(255,255,255,0.06) !important;
+              color: rgba(255,255,255,0.95) !important;
+            }
+          `}</style>
 
-        {/* Mood dot */}
-        <div className="flex items-center gap-2 mt-5 mb-7">
-          <div style={{
-            width: "5px", height: "5px", borderRadius: "50%",
-            background: moodColor, boxShadow: `0 0 7px ${moodColor}`,
-          }} />
-          <p style={{
-            fontFamily: "'Crimson Pro', serif", fontWeight: 200,
-            fontSize: "12px", color: "rgba(255,255,255,0.28)", letterSpacing: "0.04em",
-          }}>
-            {setup.genre && `${setup.genre} · `}
-            {setup.mood ? `${setup.mood} 감정` : "감정 설정 없음"}
-          </p>
-        </div>
+          <div className="page-in max-w-3xl mx-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-10">
+              <button
+                onClick={() => router.push("/city")}
+                style={{
+                  fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+                  fontSize: "11px", letterSpacing: "0.38em", textTransform: "uppercase",
+                  color: "rgba(255,255,255,0.28)", background: "none", border: "none",
+                  cursor: "pointer", transition: "color 0.3s",
+                }}
+                onMouseEnter={e => (e.currentTarget.style.color = "rgba(255,255,255,0.6)")}
+                onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.28)")}
+              >
+                ← 도시로
+              </button>
 
-        {/* Save buttons */}
-        {!saved && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "9px", justifyContent: "center" }}>
-            <button className="save-btn" onClick={() => handleSave("public")} disabled={saving}>
-              🌙 도시의 창문에 불 켜기
-            </button>
-            <button className="save-btn" onClick={() => handleSave("private")} disabled={saving}>
-              🔒 혼자 간직하기
-            </button>
-            <button className="save-btn" onClick={() => handleSave("future")} disabled={saving}>
-              ✉️ 미래의 나에게
-            </button>
-          </div>
-        )}
-
-        {/* Save feedback */}
-        {saved && (
-          <p style={{
-            textAlign: "center",
-            fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic",
-            fontWeight: 300, fontSize: "17px",
-            color: "rgba(255,255,255,0.45)", letterSpacing: "0.05em", marginTop: "8px",
-          }}>
-            {isNewBuilding
-              ? "새 건물이 도시에 솟아올랐습니다."
-              : saveMode === "public" ? "당신의 창문에 불이 켜졌습니다."
-              : saveMode === "private" ? "서랍 속에 조용히 간직되었습니다."
-              : "우체국에 편지를 맡겼습니다."}
-          </p>
-        )}
-      </div>
-
-      {/* 날짜 선택 모달 */}
-      {showDatePicker && (
-        <div
-          onClick={() => setShowDatePicker(false)}
-          style={{
-            position: "fixed", inset: 0, zIndex: 50,
-            background: "rgba(3,1,10,0.88)", backdropFilter: "blur(14px)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            padding: "24px",
-          }}
-        >
-          <div
-            className="modal-in"
-            onClick={e => e.stopPropagation()}
-            style={{
-              background: "rgba(15,8,30,0.96)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: "24px", padding: "40px 44px",
-              maxWidth: "460px", width: "100%",
-            }}
-          >
-            <p style={{
-              fontFamily: "'Crimson Pro', serif", fontWeight: 200,
-              fontSize: "11px", letterSpacing: "0.38em", textTransform: "uppercase",
-              color: "rgba(255,255,255,0.3)", marginBottom: "12px",
-            }}>
-              미래의 나에게
-            </p>
-            <h2 style={{
-              fontFamily: "'Cormorant Garamond', serif", fontWeight: 300,
-              fontSize: "22px", color: "rgba(255,255,255,0.88)",
-              marginBottom: "8px",
-            }}>
-              언제 열어볼까요?
-            </h2>
-            <p style={{
-              fontFamily: "'Crimson Pro', serif", fontWeight: 200,
-              fontSize: "13px", color: "rgba(255,255,255,0.3)",
-              marginBottom: "28px", lineHeight: 1.6,
-            }}>
-              그날이 되면 우체국에서 편지가 기다리고 있을 거예요
-            </p>
-
-            {/* 빠른 선택 */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "24px" }}>
-              {DATE_PRESETS.map(preset => (
-                <button
-                  key={preset.label}
-                  className={`date-preset ${selectedDate === addDays(preset.days) ? "date-preset-active" : ""}`}
-                  onClick={() => setSelectedDate(addDays(preset.days))}
-                >
-                  {preset.label}
-                </button>
-              ))}
+              <button
+                onClick={handleGenerate}
+                disabled={loading}
+                className="lamp-btn"
+                style={{
+                  display: "flex", alignItems: "center", gap: "8px",
+                  padding: "8px 18px", borderRadius: "100px",
+                  border: `1px solid ${moodColor}35`,
+                  background: `${moodColor}0a`,
+                  color: moodColor,
+                  fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+                  fontSize: "13px", letterSpacing: "0.06em",
+                  cursor: loading ? "default" : "pointer",
+                  transition: "all 0.4s",
+                }}
+              >
+                <span>🕯</span>
+                {loading ? "생각 중..." : "AI 도움 받기"}
+              </button>
             </div>
 
-            {/* 직접 입력 */}
-            <div style={{ marginBottom: "32px" }}>
-              <p style={{
-                fontFamily: "'Crimson Pro', serif", fontWeight: 200,
-                fontSize: "11px", letterSpacing: "0.2em",
-                color: "rgba(255,255,255,0.25)", marginBottom: "10px",
-              }}>
-                직접 날짜 선택
-              </p>
+            {/* Paper */}
+            <div
+              className={`paper-in ${saved ? `save-${saveMode}` : ""}`}
+              style={{
+                background: "rgba(255,255,255,0.028)",
+                border: "1px solid rgba(255,255,255,0.065)",
+                borderRadius: "22px", padding: "38px 42px",
+                backdropFilter: "blur(10px)",
+              }}
+            >
               <input
-                type="date"
-                value={selectedDate}
-                min={addDays(1)}
-                onChange={e => setSelectedDate(e.target.value)}
+                type="text"
+                placeholder="제목"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
                 style={{
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: "10px", padding: "10px 16px",
-                  color: "rgba(255,255,255,0.7)",
-                  fontFamily: "'Crimson Pro', serif", fontWeight: 200,
-                  fontSize: "14px", outline: "none",
-                  colorScheme: "dark",
+                  width: "100%", background: "transparent", border: "none",
+                  borderBottom: "1px solid rgba(255,255,255,0.07)",
+                  paddingBottom: "14px", marginBottom: "26px",
+                  fontFamily: "'Cormorant Garamond', serif", fontWeight: 300,
+                  fontSize: "24px", color: "rgba(255,255,255,0.82)", outline: "none",
                 }}
               />
+              <textarea
+                placeholder="오늘은 어떤 문장을 쓰고 싶나요"
+                value={content}
+                maxLength={charLimit}
+                onChange={(e) => setContent(e.target.value)}
+                style={{
+                  width: "100%", minHeight: "380px",
+                  background: "transparent", border: "none",
+                  color: "rgba(255,255,255,0.8)", resize: "none",
+                }}
+              />
+              {/* 글자 수 카운터 */}
+              <p style={{
+                textAlign: "right", marginTop: "8px",
+                fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+                fontSize: "12px", letterSpacing: "0.04em",
+                color: content.length >= charLimit
+                  ? "rgba(255,120,120,0.7)"
+                  : "rgba(255,255,255,0.2)",
+              }}>
+                {content.length} / {charLimit}
+              </p>
             </div>
 
-            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
-              <button
-                onClick={() => setShowDatePicker(false)}
-                style={{
-                  fontFamily: "'Crimson Pro', serif", fontWeight: 200,
-                  fontSize: "13px", letterSpacing: "0.06em",
-                  padding: "10px 20px", borderRadius: "100px",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  background: "transparent", color: "rgba(255,255,255,0.35)",
-                  cursor: "pointer", transition: "all 0.3s",
-                }}
-              >
-                취소
-              </button>
-              <button
-                disabled={!selectedDate || saving}
-                onClick={() => {
-                  setShowDatePicker(false);
-                  handleSave("future", selectedDate);
-                }}
-                style={{
-                  fontFamily: "'Crimson Pro', serif", fontWeight: 200,
-                  fontSize: "13px", letterSpacing: "0.06em",
-                  padding: "10px 24px", borderRadius: "100px",
-                  border: "1px solid rgba(255,255,255,0.2)",
-                  background: selectedDate ? "rgba(255,255,255,0.06)" : "transparent",
-                  color: selectedDate ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.25)",
-                  cursor: selectedDate ? "pointer" : "default",
-                  transition: "all 0.3s",
-                }}
-              >
-                우체국에 맡기기
-              </button>
+            {/* Mood dot */}
+            <div className="flex items-center gap-2 mt-5 mb-7">
+              <div style={{
+                width: "5px", height: "5px", borderRadius: "50%",
+                background: moodColor, boxShadow: `0 0 7px ${moodColor}`,
+              }} />
+              <p style={{
+                fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+                fontSize: "12px", color: "rgba(255,255,255,0.28)", letterSpacing: "0.04em",
+              }}>
+                {setup.genre && `${setup.genre} · `}
+                {setup.mood ? `${setup.mood} 감정` : "감정 설정 없음"}
+              </p>
             </div>
+
+            {/* Save buttons */}
+            {!saved && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "9px", justifyContent: "center" }}>
+                <button className="save-btn" onClick={() => handleSave("public")} disabled={saving}>
+                  🌙 도시의 창문에 불 켜기
+                </button>
+                <button className="save-btn" onClick={() => handleSave("private")} disabled={saving}>
+                  🔒 혼자 간직하기
+                </button>
+                <button className="save-btn" onClick={() => handleSave("future")} disabled={saving}>
+                  ✉️ 미래의 나에게
+                </button>
+              </div>
+            )}
+
+            {/* Save feedback */}
+            {saved && (
+              <p style={{
+                textAlign: "center",
+                fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic",
+                fontWeight: 300, fontSize: "17px",
+                color: "rgba(255,255,255,0.45)", letterSpacing: "0.05em", marginTop: "8px",
+              }}>
+                {isNewBuilding
+                  ? "새 건물이 도시에 솟아올랐습니다."
+                  : saveMode === "public" ? "당신의 창문에 불이 켜졌습니다."
+                  : saveMode === "private" ? "서랍 속에 조용히 간직되었습니다."
+                  : "우체국에 편지를 맡겼습니다."}
+              </p>
+            )}
           </div>
-        </div>
-      )}
-    </main>
+
+          {/* 날짜 선택 모달 */}
+          {showDatePicker && (
+            <div
+              onClick={() => setShowDatePicker(false)}
+              style={{
+                position: "fixed", inset: 0, zIndex: 50,
+                background: "rgba(3,1,10,0.88)", backdropFilter: "blur(14px)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                padding: "24px",
+              }}
+            >
+              <div
+                className="modal-in"
+                onClick={e => e.stopPropagation()}
+                style={{
+                  background: "rgba(15,8,30,0.96)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: "24px", padding: "40px 44px",
+                  maxWidth: "460px", width: "100%",
+                }}
+              >
+                <p style={{
+                  fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+                  fontSize: "11px", letterSpacing: "0.38em", textTransform: "uppercase",
+                  color: "rgba(255,255,255,0.3)", marginBottom: "12px",
+                }}>
+                  미래의 나에게
+                </p>
+                <h2 style={{
+                  fontFamily: "'Cormorant Garamond', serif", fontWeight: 300,
+                  fontSize: "22px", color: "rgba(255,255,255,0.88)",
+                  marginBottom: "8px",
+                }}>
+                  언제 열어볼까요?
+                </h2>
+                <p style={{
+                  fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+                  fontSize: "13px", color: "rgba(255,255,255,0.3)",
+                  marginBottom: "28px", lineHeight: 1.6,
+                }}>
+                  그날이 되면 우체국에서 편지가 기다리고 있을 거예요
+                </p>
+
+                {/* 빠른 선택 */}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "24px" }}>
+                  {DATE_PRESETS.map(preset => (
+                    <button
+                      key={preset.label}
+                      className={`date-preset ${selectedDate === addDays(preset.days) ? "date-preset-active" : ""}`}
+                      onClick={() => setSelectedDate(addDays(preset.days))}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* 직접 입력 */}
+                <div style={{ marginBottom: "32px" }}>
+                  <p style={{
+                    fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+                    fontSize: "11px", letterSpacing: "0.2em",
+                    color: "rgba(255,255,255,0.25)", marginBottom: "10px",
+                  }}>
+                    직접 날짜 선택
+                  </p>
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    min={addDays(1)}
+                    onChange={e => setSelectedDate(e.target.value)}
+                    style={{
+                      background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: "10px", padding: "10px 16px",
+                      color: "rgba(255,255,255,0.7)",
+                      fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+                      fontSize: "14px", outline: "none",
+                      colorScheme: "dark",
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+                  <button
+                    onClick={() => setShowDatePicker(false)}
+                    style={{
+                      fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+                      fontSize: "13px", letterSpacing: "0.06em",
+                      padding: "10px 20px", borderRadius: "100px",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      background: "transparent", color: "rgba(255,255,255,0.35)",
+                      cursor: "pointer", transition: "all 0.3s",
+                    }}
+                  >
+                    취소
+                  </button>
+                  <button
+                    disabled={!selectedDate || saving}
+                    onClick={() => {
+                      setShowDatePicker(false);
+                      handleSave("future", selectedDate);
+                    }}
+                    style={{
+                      fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+                      fontSize: "13px", letterSpacing: "0.06em",
+                      padding: "10px 24px", borderRadius: "100px",
+                      border: "1px solid rgba(255,255,255,0.2)",
+                      background: selectedDate ? "rgba(255,255,255,0.06)" : "transparent",
+                      color: selectedDate ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.25)",
+                      cursor: selectedDate ? "pointer" : "default",
+                      transition: "all 0.3s",
+                    }}
+                  >
+                    우체국에 맡기기
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </main>
+      </AuthGuard>
     </>
   );
 }
