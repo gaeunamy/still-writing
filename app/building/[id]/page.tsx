@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
+import { Toast, useToast } from "../../components/Toast";
 
 type Writing = {
   id: string;
@@ -48,6 +49,7 @@ export default function BuildingPage() {
   const [emptySlots, setEmptySlots] = useState<Slot[]>([]);
   const [confirmDelete, setConfirmDelete] = useState<Writing | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const { toast, showToast, hideToast } = useToast();
 
   useEffect(() => {
     if (id) fetchBuilding();
@@ -161,7 +163,7 @@ export default function BuildingPage() {
     }
 
     if (!targetSlot) {
-      alert("해당 건물에 빈 자리가 없습니다.");
+      showToast("해당 건물에 빈 자리가 없습니다.", "info");
       setActionLoading(false);
       return;
     }
@@ -207,6 +209,8 @@ export default function BuildingPage() {
   if (!building) return null;
 
   return (
+    <>
+    {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
     <main
       className="relative min-h-screen px-6 py-14"
       style={{ background: "linear-gradient(180deg, #03010a 0%, #080318 55%, #100828 100%)" }}
@@ -773,5 +777,6 @@ export default function BuildingPage() {
         </div>
       )}
     </main>
+    </>
   );
 }

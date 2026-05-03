@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
+import { Toast, useToast } from "../components/Toast";
 
 type WritingSetup = {
   genre: string;
@@ -27,6 +28,12 @@ const MOOD_COLORS: Record<string, string> = {
   차분한: "#a0b8b0",
 };
 
+const CHAR_LIMITS: Record<string, number> = {
+  짧게: 200,
+  적당히: 500,
+  길게: 1500,
+};
+
 const FLOORS_PER_BUILDING = 6;
 const UNITS_PER_FLOOR = 2;
 
@@ -49,27 +56,24 @@ async function assignBuildingSlot(genre: string): Promise<{
       .eq("building_id", building.id);
 
     const occupied = new Set((writings ?? []).map((w) => `${w.floor}-${w.unit}`));
-
     const empty: { floor: number; unit: number }[] = [];
+
     for (let floor = 1; floor <= building.floor_count; floor++) {
       for (let unit = 1; unit <= UNITS_PER_FLOOR; unit++) {
-        if (!occupied.has(`${floor}-${unit}`)) {
-          empty.push({ floor, unit });
-        }
+        if (!occupied.has(`${floor}-${unit}`)) empty.push({ floor, unit });
       }
     }
+
     if (empty.length > 0) {
       const pick = empty[Math.floor(Math.random() * empty.length)];
       return { buildingId: building.id, floor: pick.floor, unit: pick.unit, isNew: false };
     }
   }
 
-  // 빈 슬롯 없음 → 새 건물 생성
-const genreNames: Record<string, string> = { 시: "시집", 소설: "소설관", 일기: "일기탑" };
+  const genreNames: Record<string, string> = { 시: "시집", 소설: "소설관", 일기: "일기탑" };
   const count = (buildings ?? []).length;
   const name = `${genreNames[genre] ?? genre} ${count + 1}호`;
-
-  const randomFloors = Math.floor(Math.random() * 5) + 4; // 4~8층 랜덤
+  const randomFloors = Math.floor(Math.random() * 5) + 4;
 
   const { data: newBuilding, error } = await supabase
     .from("buildings")
@@ -79,9 +83,22 @@ const genreNames: Record<string, string> = { 시: "시집", 소설: "소설관",
 
   if (error || !newBuilding) throw new Error("건물 생성 실패");
 
-  // 새 건물 1층도 랜덤 유닛
   const firstUnit = Math.random() < 0.5 ? 1 : 2;
   return { buildingId: newBuilding.id, floor: 1, unit: firstUnit, isNew: true };
+}
+
+const DATE_PRESETS = [
+  { label: "1주 후", days: 7 },
+  { label: "1달 후", days: 30 },
+  { label: "3달 후", days: 90 },
+  { label: "6달 후", days: 180 },
+  { label: "1년 후", days: 365 },
+];
+
+function addDays(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split("T")[0];
 }
 
 export default function EditorPage() {
@@ -93,6 +110,9 @@ export default function EditorPage() {
   const [saveMode, setSaveMode] = useState<SaveMode>(null);
   const [saved, setSaved] = useState(false);
   const [isNewBuilding, setIsNewBuilding] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState("");
+  const { toast, showToast, hideToast } = useToast();
 
   const [setup, setSetup] = useState<WritingSetup>({
     genre: "", mood: "", speaker: "", image: "",
@@ -108,24 +128,33 @@ export default function EditorPage() {
   }, []);
 
   const moodColor = MOOD_COLORS[setup.mood] ?? "#a0a8b8";
+  const charLimit = CHAR_LIMITS[setup.length] ?? 500;
 
   const handleGenerate = async () => {
     if (!setup.genre) return;
     setLoading(true);
+
+    const lengthGuide: Record<string, string> = {
+      짧게: "100자 이내로",
+      적당히: "200자 내외로",
+      길게: "400자 내외로",
+    };
+    const lengthText = lengthGuide[setup.length] || "200자 내외로";
+
     let prompt = "";
     if (setup.genre === "시") {
-      prompt = `${setup.mood || "고요한"} 정서, ${setup.speaker || "나"} 화자, ${setup.image || "밤"} 이미지, ${setup.length || "적당히"} 분량으로 감성적인 시의 첫 문장을 제안해주세요. 직접 이어 쓸 수 있도록 여운을 남겨주세요.`;
+      prompt = `${setup.mood || "고요한"} 정서, ${setup.speaker || "나"} 화자, ${setup.image || "밤"} 이미지를 담아 감성적인 시를 ${lengthText} 제안해주세요. 직접 이어 쓸 수 있도록 여운을 남겨주세요.`;
     } else if (setup.genre === "소설") {
-      prompt = `${setup.view || "1인칭"} 시점, ${setup.setting || "도시"} 배경, ${setup.ending || "열린 결말"} 분위기로 독자가 몰입할 수 있는 소설의 첫 장면을 제안해주세요.`;
+      prompt = `${setup.view || "1인칭"} 시점, ${setup.setting || "도시"} 배경, ${setup.ending || "열린 결말"} 분위기로 독자가 몰입할 수 있는 소설의 첫 장면을 ${lengthText} 제안해주세요.`;
     } else {
-      prompt = `${setup.mood || "차분한"} 감정으로 오늘의 일기 첫 문장을 제안해주세요. 솔직하고 여운 있게.`;
+      prompt = `${setup.mood || "차분한"} 감정으로 오늘의 일기를 ${lengthText} 제안해주세요. 솔직하고 여운 있게.`;
     }
 
     try {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt, length: setup.length || "적당히" }),
       });
       const data = await res.json();
       if (data.result) setContent((prev) => prev ? prev + "\n\n" + data.result : data.result);
@@ -133,31 +162,54 @@ export default function EditorPage() {
     setLoading(false);
   };
 
-  const handleSave = async (mode: SaveMode) => {
+  const handleSave = async (mode: SaveMode, openAt?: string) => {
     if (!content.trim()) return;
+
+    // 미래의 나에게 — 날짜 선택 먼저
+    if (mode === "future" && !openAt) {
+      setSaveMode("future");
+      setShowDatePicker(true);
+      return;
+    }
+
     setSaving(true);
     setSaveMode(mode);
 
     try {
-      const genre = setup.genre || "일기";
-      const { buildingId, floor, unit, isNew } = await assignBuildingSlot(genre);
-      setIsNewBuilding(isNew);
+      if (mode === "future") {
+        const { error } = await supabase.from("writings").insert({
+          title: title || null,
+          content,
+          genre: setup.genre || "일기",
+          mood: setup.mood || null,
+          is_public: false,
+          emotion_color: moodColor,
+          open_at: openAt ? new Date(openAt).toISOString() : null,
+        });
+        if (error) {
+          console.error("Supabase insert error:", JSON.stringify(error));
+          throw error;
+        }
+      } else {
+        const genre = setup.genre || "일기";
+        const { buildingId, floor, unit, isNew } = await assignBuildingSlot(genre);
+        setIsNewBuilding(isNew);
 
-      const { error } = await supabase.from("writings").insert({
-        title: title || null,
-        content,
-        genre,
-        mood: setup.mood || null,
-        is_public: mode === "public",
-        emotion_color: moodColor,
-        building_id: buildingId,
-        floor,
-        unit,
-      });
-
-      if (error) {
-        console.error("Supabase insert error:", JSON.stringify(error));
-        throw error;
+        const { error } = await supabase.from("writings").insert({
+          title: title || null,
+          content,
+          genre,
+          mood: setup.mood || null,
+          is_public: mode === "public",
+          emotion_color: moodColor,
+          building_id: buildingId,
+          floor,
+          unit,
+        });
+        if (error) {
+          console.error("Supabase insert error:", JSON.stringify(error));
+          throw error;
+        }
       }
 
       const local = JSON.parse(localStorage.getItem("savedWritings") || "[]");
@@ -170,13 +222,15 @@ export default function EditorPage() {
       setTimeout(() => router.push("/city"), 2400);
     } catch (e) {
       console.error("Save error:", e);
-      alert("저장 중 오류가 발생했습니다.");
+      showToast("저장 중 오류가 발생했습니다.", "error");
       setSaving(false);
       setSaveMode(null);
     }
   };
 
   return (
+    <>
+    {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
     <main
       className="min-h-screen text-white px-6 py-14 transition-all duration-1000"
       style={{
@@ -187,16 +241,18 @@ export default function EditorPage() {
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;1,300&family=Crimson+Pro:wght@200;300&display=swap');
         @keyframes fadeIn { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
         @keyframes paperIn { from{opacity:0;transform:scaleY(0.97) translateY(10px)} to{opacity:1;transform:scaleY(1) translateY(0)} }
-        @keyframes savePublic  { 0%{opacity:1;transform:scale(1) translateY(0)} 100%{opacity:0;transform:scale(0.98) translateY(-24px)} }
+        @keyframes savePublic  { 0%{opacity:1;transform:scale(1)} 100%{opacity:0;transform:scale(0.98) translateY(-24px)} }
         @keyframes savePrivate { 0%{opacity:1;transform:translateY(0)} 100%{opacity:0;transform:translateY(32px)} }
         @keyframes saveFuture  { 0%{opacity:1;transform:translateY(0) rotate(0deg)} 100%{opacity:0;transform:translateY(-70px) rotate(-10deg)} }
         @keyframes lampPulse   { 0%,100%{box-shadow:0 0 10px 2px rgba(255,215,100,0.18)} 50%{box-shadow:0 0 22px 5px rgba(255,215,100,0.36)} }
+        @keyframes modalIn { from{opacity:0;transform:translateY(20px) scale(0.98)} to{opacity:1;transform:translateY(0) scale(1)} }
         .page-in  { animation: fadeIn  0.8s ease-out both; }
         .paper-in { animation: paperIn 0.85s 0.2s ease-out both; }
         .lamp-btn { animation: lampPulse 3s ease-in-out infinite; }
         .save-public  { animation: savePublic  2.2s ease-in-out forwards; }
         .save-private { animation: savePrivate 2.2s ease-in-out forwards; }
         .save-future  { animation: saveFuture  2.2s ease-in-out forwards; }
+        .modal-in { animation: modalIn 0.45s ease-out both; }
         textarea {
           font-family: 'Cormorant Garamond', serif;
           font-size: 18px; font-weight: 300; line-height: 1.95;
@@ -214,6 +270,20 @@ export default function EditorPage() {
         }
         .save-btn:hover { border-color:rgba(255,255,255,0.32); color:rgba(255,255,255,0.92); background:rgba(255,255,255,0.03); }
         .save-btn:disabled { opacity:0.4; cursor:default; }
+        .date-preset {
+          font-family: 'Crimson Pro', serif; font-weight: 200;
+          font-size: 13px; letter-spacing: 0.06em;
+          padding: 9px 20px; border-radius: 100px;
+          border: 1px solid rgba(255,255,255,0.1);
+          background: transparent; color: rgba(255,255,255,0.55);
+          cursor: pointer; transition: all 0.3s;
+        }
+        .date-preset:hover { border-color:rgba(255,255,255,0.32); color:rgba(255,255,255,0.9); }
+        .date-preset-active {
+          border-color: rgba(255,255,255,0.6) !important;
+          background: rgba(255,255,255,0.06) !important;
+          color: rgba(255,255,255,0.95) !important;
+        }
       `}</style>
 
       <div className="page-in max-w-3xl mx-auto">
@@ -280,6 +350,7 @@ export default function EditorPage() {
           <textarea
             placeholder="오늘은 어떤 문장을 쓰고 싶나요"
             value={content}
+            maxLength={charLimit}
             onChange={(e) => setContent(e.target.value)}
             style={{
               width: "100%", minHeight: "380px",
@@ -287,6 +358,17 @@ export default function EditorPage() {
               color: "rgba(255,255,255,0.8)", resize: "none",
             }}
           />
+          {/* 글자 수 카운터 */}
+          <p style={{
+            textAlign: "right", marginTop: "8px",
+            fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+            fontSize: "12px", letterSpacing: "0.04em",
+            color: content.length >= charLimit
+              ? "rgba(255,120,120,0.7)"
+              : "rgba(255,255,255,0.2)",
+          }}>
+            {content.length} / {charLimit}
+          </p>
         </div>
 
         {/* Mood dot */}
@@ -331,10 +413,131 @@ export default function EditorPage() {
               ? "새 건물이 도시에 솟아올랐습니다."
               : saveMode === "public" ? "당신의 창문에 불이 켜졌습니다."
               : saveMode === "private" ? "서랍 속에 조용히 간직되었습니다."
-              : "밤하늘 어딘가로 날아갔습니다."}
+              : "우체국에 편지를 맡겼습니다."}
           </p>
         )}
       </div>
+
+      {/* 날짜 선택 모달 */}
+      {showDatePicker && (
+        <div
+          onClick={() => setShowDatePicker(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 50,
+            background: "rgba(3,1,10,0.88)", backdropFilter: "blur(14px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "24px",
+          }}
+        >
+          <div
+            className="modal-in"
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: "rgba(15,8,30,0.96)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: "24px", padding: "40px 44px",
+              maxWidth: "460px", width: "100%",
+            }}
+          >
+            <p style={{
+              fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+              fontSize: "11px", letterSpacing: "0.38em", textTransform: "uppercase",
+              color: "rgba(255,255,255,0.3)", marginBottom: "12px",
+            }}>
+              미래의 나에게
+            </p>
+            <h2 style={{
+              fontFamily: "'Cormorant Garamond', serif", fontWeight: 300,
+              fontSize: "22px", color: "rgba(255,255,255,0.88)",
+              marginBottom: "8px",
+            }}>
+              언제 열어볼까요?
+            </h2>
+            <p style={{
+              fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+              fontSize: "13px", color: "rgba(255,255,255,0.3)",
+              marginBottom: "28px", lineHeight: 1.6,
+            }}>
+              그날이 되면 우체국에서 편지가 기다리고 있을 거예요
+            </p>
+
+            {/* 빠른 선택 */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "24px" }}>
+              {DATE_PRESETS.map(preset => (
+                <button
+                  key={preset.label}
+                  className={`date-preset ${selectedDate === addDays(preset.days) ? "date-preset-active" : ""}`}
+                  onClick={() => setSelectedDate(addDays(preset.days))}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+
+            {/* 직접 입력 */}
+            <div style={{ marginBottom: "32px" }}>
+              <p style={{
+                fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+                fontSize: "11px", letterSpacing: "0.2em",
+                color: "rgba(255,255,255,0.25)", marginBottom: "10px",
+              }}>
+                직접 날짜 선택
+              </p>
+              <input
+                type="date"
+                value={selectedDate}
+                min={addDays(1)}
+                onChange={e => setSelectedDate(e.target.value)}
+                style={{
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: "10px", padding: "10px 16px",
+                  color: "rgba(255,255,255,0.7)",
+                  fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+                  fontSize: "14px", outline: "none",
+                  colorScheme: "dark",
+                }}
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setShowDatePicker(false)}
+                style={{
+                  fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+                  fontSize: "13px", letterSpacing: "0.06em",
+                  padding: "10px 20px", borderRadius: "100px",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  background: "transparent", color: "rgba(255,255,255,0.35)",
+                  cursor: "pointer", transition: "all 0.3s",
+                }}
+              >
+                취소
+              </button>
+              <button
+                disabled={!selectedDate || saving}
+                onClick={() => {
+                  setShowDatePicker(false);
+                  handleSave("future", selectedDate);
+                }}
+                style={{
+                  fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+                  fontSize: "13px", letterSpacing: "0.06em",
+                  padding: "10px 24px", borderRadius: "100px",
+                  border: "1px solid rgba(255,255,255,0.2)",
+                  background: selectedDate ? "rgba(255,255,255,0.06)" : "transparent",
+                  color: selectedDate ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.25)",
+                  cursor: selectedDate ? "pointer" : "default",
+                  transition: "all 0.3s",
+                }}
+              >
+                우체국에 맡기기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
+    </>
   );
 }
