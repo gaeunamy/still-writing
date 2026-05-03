@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { supabase } from "../lib/supabase";
 
 // --- Star data ---
 const STAR_COUNT = 80;
@@ -82,6 +84,14 @@ function getWindowColor() {
 }
 
 export default function Home() {
+  const router = useRouter(); 
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) router.push("/city");
+    });
+  }, []);
+  
   const [stars] = useState(() => generateStars(STAR_COUNT));
   const [buildings] = useState(() => generateBuildings());
   const [mounted, setMounted] = useState(false);
