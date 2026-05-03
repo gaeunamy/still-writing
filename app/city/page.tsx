@@ -60,9 +60,223 @@ const GENRE_LABEL: Record<string, string> = {
   일기: "일기탑",
 };
 
-function getWindowColor(floor: number, unit: number, emotionColor?: string | null) {
+function getWindowColor(floor: number, unit: number, emotionColor?: string | null, buildingId?: string) {
   if (emotionColor) return emotionColor;
-  return WINDOW_COLORS[(floor * 2 + unit) % WINDOW_COLORS.length];
+  const seed = buildingId ? buildingId.charCodeAt(0) + buildingId.charCodeAt(1) : 0;
+  return WINDOW_COLORS[(floor * 2 + unit + seed) % WINDOW_COLORS.length];
+}
+
+// 건물 블록 컴포넌트
+function BuildingBlock({
+  b, bi, risingId, floatingLabel, hoveredId, setHoveredId, onCityClick,
+  isWindowLit, getWritingColor,
+}: {
+  b: Building;
+  bi: number;
+  risingId: string | null;
+  floatingLabel: { id: string; text: string } | null;
+  hoveredId: string | null;
+  setHoveredId: (id: string | null) => void;
+  onCityClick: (id: string) => void;
+  isWindowLit: (b: Building, floor: number, unit: number) => boolean;
+  getWritingColor: (b: Building, floor: number, unit: number) => string;
+}) {
+  const bh = 60 + b.floor_count * 18;
+  const bw = GENRE_WIDTH[b.genre] ?? 50;
+  const accentColor = GENRE_COLOR[b.genre] ?? "#c8c0b0";
+  const isNew = risingId === b.id;
+  const showFloat = floatingLabel?.id === b.id;
+  const isHovered = hoveredId === b.id;
+
+  return (
+    <div
+      className={isNew ? "building-rise" : ""}
+      onClick={() => onCityClick(b.id)}
+      onMouseEnter={() => setHoveredId(b.id)}
+      onMouseLeave={() => setHoveredId(null)}
+      style={{
+        position: "relative",
+        cursor: "pointer",
+        flexShrink: 0,
+        width: bw,
+        height: bh,
+        outline: isHovered ? `1px solid ${accentColor}50` : "1px solid transparent",
+        transform: isHovered ? "translateY(-4px)" : "translateY(0)",
+        transition: "transform 0.3s ease",
+      }}
+    >
+      {showFloat && (
+        <div className="float-label" style={{
+          position: "absolute", top: "-32px", left: "50%",
+          whiteSpace: "nowrap", pointerEvents: "none", zIndex: 30,
+          fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+          fontSize: "11px", letterSpacing: "0.08em",
+          color: "rgba(255,255,255,0.55)",
+          background: "rgba(10,5,25,0.7)",
+          padding: "3px 10px", borderRadius: "20px",
+          border: "1px solid rgba(255,255,255,0.08)",
+        }}>
+          {floatingLabel!.text}
+        </div>
+      )}
+
+      {isHovered && (
+        <div style={{
+          position: "absolute", top: "-22px", left: "50%",
+          transform: "translateX(-50%)",
+          whiteSpace: "nowrap", pointerEvents: "none", zIndex: 30,
+          fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+          fontSize: "10px", letterSpacing: "0.08em",
+          color: `${accentColor}cc`,
+        }}>
+          {GENRE_LABEL[b.genre] ?? b.genre}
+        </div>
+      )}
+
+      <div style={{
+        position: "absolute", inset: 0,
+        background: `hsl(240,18%,${9 + bi % 4}%)`,
+        border: "0.5px solid rgba(255,255,255,0.04)",
+      }} />
+      <div style={{
+        position: "absolute", top: 0, left: 0, right: 0, height: "2.5px",
+        background: `${accentColor}30`,
+      }} />
+
+      {Array.from({ length: b.floor_count }).map((_, floorIdx) => {
+        const floor = b.floor_count - floorIdx;
+        const topPx = 10 + floorIdx * 18;
+        return [0, 1].map((unitIdx) => {
+          const unit = unitIdx + 1;
+          const leftPx = unitIdx === 0 ? 7 : bw - 17;
+          const lit = isWindowLit(b, floor, unit);
+          const wc = getWritingColor(b, floor, unit);
+          const bd = `${9 + (floor * 3 + unitIdx) % 8}s`;
+          const bly = `${(floor + unitIdx) % 6}s`;
+          return (
+            <div
+              key={`${floor}-${unitIdx}`}
+              className={lit ? "win-lit" : ""}
+              style={{
+                position: "absolute",
+                top: topPx, left: leftPx,
+                width: 10, height: 12, borderRadius: 1,
+                background: lit ? wc : "rgba(255,255,255,0.03)",
+                opacity: lit ? 0.85 : 1,
+                ...(lit ? {
+                  "--wc": wc + "88",
+                  "--bd": bd,
+                  "--bly": bly,
+                } as React.CSSProperties : {}),
+              }}
+            />
+          );
+        });
+      })}
+    </div>
+  );
+}
+
+function PostOfficeBuilding({ letterCount, onClick }: { letterCount: number; onClick: () => void }) {
+  const [hovered, setHovered] = useState(false);
+  const bw = 52;
+  const bh = 80;
+  const litCount = Math.min(letterCount, 6);
+
+  return (
+    <div
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        position: "relative",
+        cursor: "pointer",
+        flexShrink: 0,
+        width: bw,
+        height: bh,
+        transform: hovered ? "translateY(-4px)" : "translateY(0)",
+        transition: "transform 0.3s ease",
+      }}
+    >
+      {hovered && (
+        <div style={{
+          position: "absolute", top: "-22px", left: "50%",
+          transform: "translateX(-50%)",
+          whiteSpace: "nowrap", pointerEvents: "none", zIndex: 30,
+          fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+          fontSize: "10px", letterSpacing: "0.08em",
+          color: "rgba(255,220,150,0.8)",
+        }}>
+          우체국
+        </div>
+      )}
+
+      <div style={{
+        position: "absolute", inset: 0,
+        background: "hsl(35, 15%, 10%)",
+        border: "0.5px solid rgba(255,220,150,0.1)",
+      }} />
+
+      <svg width={bw} height={14} style={{ position: "absolute", top: -12, left: 0 }} viewBox={`0 0 ${bw} 14`}>
+        <polygon points={`0,14 ${bw / 2},0 ${bw},14`} fill="hsl(35,15%,12%)" stroke="rgba(255,220,150,0.1)" strokeWidth="0.5" />
+      </svg>
+
+      <div style={{
+        position: "absolute", top: -18, left: "50%",
+        transform: "translateX(-50%)",
+        width: 4, height: 4, borderRadius: "50%",
+        background: "rgba(255,220,100,0.6)",
+        boxShadow: "0 0 6px 2px rgba(255,220,100,0.4)",
+      }} />
+
+      <div style={{
+        position: "absolute", top: 8, left: "50%",
+        transform: "translateX(-50%)",
+        whiteSpace: "nowrap",
+        fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+        fontSize: "7px", letterSpacing: "0.15em",
+        color: "rgba(255,220,150,0.5)",
+      }}>
+        POST
+      </div>
+
+      {Array.from({ length: 3 }).map((_, row) =>
+        [0, 1].map((col) => {
+          const idx = row * 2 + col;
+          const lit = idx < litCount;
+          const x = col === 0 ? 9 : bw - 19;
+          const y = 22 + row * 16;
+          return (
+            <div
+              key={`${row}-${col}`}
+              className={lit ? "win-lit" : ""}
+              style={{
+                position: "absolute",
+                top: y, left: x,
+                width: 10, height: 10, borderRadius: 1,
+                background: lit ? "#e8c870" : "rgba(255,255,255,0.03)",
+                opacity: lit ? 0.85 : 1,
+                ...(lit ? {
+                  "--wc": "#e8c87066",
+                  "--bd": `${10 + idx * 2}s`,
+                  "--bly": `${idx}s`,
+                } as React.CSSProperties : {}),
+              }}
+            />
+          );
+        })
+      )}
+
+      <div style={{
+        position: "absolute", bottom: 0, left: "50%",
+        transform: "translateX(-50%)",
+        width: 14, height: 20,
+        background: "rgba(255,220,100,0.06)",
+        border: "0.5px solid rgba(255,220,100,0.12)",
+        borderRadius: "3px 3px 0 0",
+      }} />
+    </div>
+  );
 }
 
 export default function CityPage() {
@@ -73,6 +287,7 @@ export default function CityPage() {
   const [floatingLabel, setFloatingLabel] = useState<{ id: string; text: string } | null>(null);
   const [stars, setStars] = useState<Star[]>([]);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [letterCount, setLetterCount] = useState(0);
 
   useEffect(() => {
     setStars(
@@ -89,6 +304,16 @@ export default function CityPage() {
     fetchCity();
   }, []);
 
+  useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const newBuildingId = params.get("newBuilding");
+  if (newBuildingId) {
+    setRisingId(newBuildingId);
+    setTimeout(() => setRisingId(null), 1500);
+  }
+  fetchCity();
+}, []);
+
   async function fetchCity() {
     setLoading(true);
     const { data: bData } = await supabase
@@ -99,6 +324,12 @@ export default function CityPage() {
     if (!bData || bData.length === 0) {
       setBuildings([]);
       setLoading(false);
+
+      const { count: postCount } = await supabase
+        .from("writings")
+        .select("id", { count: "exact", head: true })
+        .not("open_at", "is", null);
+      setLetterCount(postCount ?? 0);
       return;
     }
 
@@ -113,6 +344,13 @@ export default function CityPage() {
     }));
 
     setBuildings(enriched);
+
+    const { count: postCount } = await supabase
+      .from("writings")
+      .select("id", { count: "exact", head: true })
+      .not("open_at", "is", null);
+    setLetterCount(postCount ?? 0);
+
     setLoading(false);
 
     if (enriched.length > 0) {
@@ -125,18 +363,18 @@ export default function CityPage() {
 
   const isEmpty = !loading && buildings.length === 0;
 
-  function getBuildingHeight(b: Building) {
-    return 60 + b.floor_count * 18;
-  }
-
   function isWindowLit(b: Building, floor: number, unit: number) {
     return b.writings.some((w) => w.floor === floor && w.unit === unit);
   }
 
-  function getWritingColor(b: Building, floor: number, unit: number) {
-    const w = b.writings.find((wr) => wr.floor === floor && wr.unit === unit);
-    return getWindowColor(floor, unit, w?.emotion_color);
-  }
+function getWritingColor(b: Building, floor: number, unit: number) {
+  const w = b.writings.find((wr) => wr.floor === floor && wr.unit === unit);
+  return getWindowColor(floor, unit, w?.emotion_color, b.id);
+}
+
+  // 건물을 홀수/짝수 인덱스로 좌/우 분리
+  const leftBuildings = buildings.filter((_, i) => i % 2 === 0).reverse();
+  const rightBuildings = buildings.filter((_, i) => i % 2 === 1);
 
   return (
     <main
@@ -187,14 +425,14 @@ export default function CityPage() {
         .star          { animation: twinkle var(--dur) var(--dly) ease-in-out infinite; }
         .lamp          { animation: lampPulse 2.8s ease-in-out infinite; }
         .building-rise { animation: buildingRise 1.1s cubic-bezier(0.22,1,0.36,1) forwards; }
-        .win-lit       {
+        .win-lit {
           animation:
             winBlink var(--bd) var(--bly) ease-in-out infinite,
             winGlow var(--bd) var(--bly) ease-in-out infinite;
         }
-        .fade-up       { animation: fadeUp 0.8s ease-out both; }
-        .ground-glow   { animation: groundGlow 4s ease-in-out infinite; }
-        .float-label   { animation: floatLabel 3s ease-in-out forwards; }
+        .fade-up     { animation: fadeUp 0.8s ease-out both; }
+        .ground-glow { animation: groundGlow 4s ease-in-out infinite; }
+        .float-label { animation: floatLabel 3s ease-in-out forwards; }
       `}</style>
 
       {/* Stars */}
@@ -286,135 +524,52 @@ export default function CityPage() {
           background: "linear-gradient(to top, rgba(60,20,120,0.22), transparent)",
         }} />
 
-        {/* Streetlamp */}
-        <div className="absolute lamp" style={{ bottom: "0px", left: "calc(50% - 80px)", zIndex: 10 }}>
-          <svg width="18" height="90" viewBox="0 0 18 90" fill="none">
-            <rect x="8" y="20" width="2" height="70" fill="rgba(200,190,170,0.55)" />
-            <path d="M9 20 Q9 8 16 8" stroke="rgba(200,190,170,0.55)" strokeWidth="1.8" fill="none" />
-            <ellipse cx="16" cy="7" rx="5" ry="3" fill="rgba(255,220,100,0.9)" />
-            <polygon points="11,10 21,10 24,28 8,28" fill="rgba(255,210,80,0.07)" />
-          </svg>
-        </div>
-
-        {/* Buildings */}
         {!loading && (
           <div style={{
-            display: "flex", alignItems: "flex-end",
-            gap: "6px",
-            paddingLeft: "16px", paddingRight: "16px",
-            paddingTop: "40px",
-            flexWrap: "nowrap",
-            overflow: "visible",
-            width: "100%",
-            boxSizing: "border-box",
-            justifyContent: "center",
+            display: "flex", alignItems: "flex-end", justifyContent: "center",
+            width: "100%", paddingTop: "40px", overflow: "visible",
           }}>
-            {buildings.map((b, bi) => {
-              const bh = getBuildingHeight(b);
-              const bw = GENRE_WIDTH[b.genre] ?? 50;
-              const accentColor = GENRE_COLOR[b.genre] ?? "#c8c0b0";
-              const isNew = risingId === b.id;
-              const showFloat = floatingLabel?.id === b.id;
-              const isHovered = hoveredId === b.id;
+            {/* 왼쪽 건물들 — 중앙에서 바깥으로 */}
+            <div style={{ display: "flex", alignItems: "flex-end", flexDirection: "row", gap: "6px" }}>
+              {leftBuildings.map((b, bi) => (
+                <BuildingBlock
+                  key={b.id} b={b} bi={bi}
+                  risingId={risingId} floatingLabel={floatingLabel}
+                  hoveredId={hoveredId} setHoveredId={setHoveredId}
+                  onCityClick={(id) => router.push(`/building/${id}`)}
+                  isWindowLit={isWindowLit} getWritingColor={getWritingColor}
+                />
+              ))}
+            </div>
 
-              return (
-                <div
-                  key={b.id}
-                  className={isNew ? "building-rise" : ""}
-                  onClick={() => router.push(`/building/${b.id}`)}
-                  onMouseEnter={() => setHoveredId(b.id)}
-                  onMouseLeave={() => setHoveredId(null)}
-                  style={{
-                    position: "relative",
-                    cursor: "pointer",
-                    flexShrink: 0,
-                    width: bw,
-                    height: bh,
-                    transform: isHovered ? "translateY(-4px)" : "translateY(0)",
-                    transition: "transform 0.3s ease",
-                  }}
-                >
-                  {/* Floating count label */}
-                  {showFloat && (
-                    <div className="float-label" style={{
-                      position: "absolute", top: "-32px", left: "50%",
-                      whiteSpace: "nowrap", pointerEvents: "none", zIndex: 30,
-                      fontFamily: "'Crimson Pro', serif", fontWeight: 200,
-                      fontSize: "11px", letterSpacing: "0.08em",
-                      color: "rgba(255,255,255,0.55)",
-                      background: "rgba(10,5,25,0.7)",
-                      padding: "3px 10px", borderRadius: "20px",
-                      border: "1px solid rgba(255,255,255,0.08)",
-                    }}>
-                      {floatingLabel!.text}
-                    </div>
-                  )}
+            {/* 가로등 */}
+            <div className="lamp" style={{ flexShrink: 0, zIndex: 10, marginBottom: 0, marginRight: "16px" }}>
+              <svg width="18" height="90" viewBox="0 0 18 90" fill="none">
+                <rect x="8" y="20" width="2" height="70" fill="rgba(200,190,170,0.55)" />
+                <path d="M9 20 Q9 8 16 8" stroke="rgba(200,190,170,0.55)" strokeWidth="1.8" fill="none" />
+                <ellipse cx="16" cy="7" rx="5" ry="3" fill="rgba(255,220,100,0.9)" />
+                <polygon points="11,10 21,10 24,28 8,28" fill="rgba(255,210,80,0.07)" />
+              </svg>
+            </div>
 
-                  {/* Hover genre label */}
-                  {isHovered && (
-                    <div style={{
-                      position: "absolute", top: "-22px", left: "50%",
-                      transform: "translateX(-50%)",
-                      whiteSpace: "nowrap", pointerEvents: "none", zIndex: 30,
-                      fontFamily: "'Crimson Pro', serif", fontWeight: 200,
-                      fontSize: "10px", letterSpacing: "0.08em",
-                      color: `${accentColor}cc`,
-                    }}>
-                      {GENRE_LABEL[b.genre] ?? b.genre}
-                    </div>
-                  )}
+            {/* 우체국 — 가로등 바로 오른쪽 */}
+            <PostOfficeBuilding
+              letterCount={letterCount}
+              onClick={() => router.push("/post-office")}
+            />
 
-                  {/* Building body */}
-                  <div style={{
-                    position: "absolute", inset: 0,
-                    background: `hsl(240,18%,${9 + bi % 4}%)`,
-                    border: "0.5px solid rgba(255,255,255,0.04)",
-                  }} />
-
-                  {/* Roof accent */}
-                  <div style={{
-                    position: "absolute", top: 0, left: 0, right: 0, height: "2.5px",
-                    background: `${accentColor}30`,
-                  }} />
-
-                  {/* Windows grid */}
-                  {Array.from({ length: b.floor_count }).map((_, floorIdx) => {
-                    const floor = b.floor_count - floorIdx;
-                    const topPx = 10 + floorIdx * 18;
-                    return [0, 1].map((unitIdx) => {
-                      const unit = unitIdx + 1;
-                      const leftPx = unitIdx === 0 ? 7 : bw - 17;
-                      const lit = isWindowLit(b, floor, unit);
-                      const wc = getWritingColor(b, floor, unit);
-                      const bd = `${9 + (floor * 3 + unitIdx) % 8}s`;
-                      const bly = `${(floor + unitIdx) % 6}s`;
-
-                      return (
-                        <div
-                          key={`${floor}-${unitIdx}`}
-                          className={lit ? "win-lit" : ""}
-                          style={{
-                            position: "absolute",
-                            top: topPx,
-                            left: leftPx,
-                            width: 10,
-                            height: 12,
-                            borderRadius: 1,
-                            background: lit ? wc : "rgba(255,255,255,0.03)",
-                            opacity: lit ? 0.85 : 1,
-                            ...(lit ? {
-                              "--wc": wc + "88",
-                              "--bd": bd,
-                              "--bly": bly,
-                            } as React.CSSProperties : {}),
-                          }}
-                        />
-                      );
-                    });
-                  })}
-                </div>
-              );
-            })}
+            {/* 오른쪽 건물들 */}
+            <div style={{ display: "flex", alignItems: "flex-end", gap: "6px", marginLeft: "6px" }}>
+              {rightBuildings.map((b, bi) => (
+                <BuildingBlock
+                  key={b.id} b={b} bi={bi}
+                  risingId={risingId} floatingLabel={floatingLabel}
+                  hoveredId={hoveredId} setHoveredId={setHoveredId}
+                  onCityClick={(id) => router.push(`/building/${id}`)}
+                  isWindowLit={isWindowLit} getWritingColor={getWritingColor}
+                />
+              ))}
+            </div>
           </div>
         )}
       </div>
