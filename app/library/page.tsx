@@ -206,6 +206,26 @@ export default function LibraryPage() {
               ))}
             </div>
           )}
+          {/* 로그아웃 */}
+          <div className="fade-up text-center" style={{ marginTop: "60px", animationDelay: "0.3s" }}>
+            <button
+              onClick={async () => {
+                await supabase.auth.signOut();
+                router.push("/");
+              }}
+              style={{
+                fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+                fontSize: "12px", letterSpacing: "0.1em",
+                color: "rgba(255,255,255,0.2)",
+                background: "transparent", border: "none",
+                cursor: "pointer", transition: "color 0.3s",
+              }}
+              onMouseEnter={e => (e.currentTarget.style.color = "rgba(255,255,255,0.45)")}
+              onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.2)")}
+            >
+              로그아웃
+            </button>
+          </div>
         </div>
 
         {/* Modal */}
