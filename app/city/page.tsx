@@ -475,21 +475,18 @@ function getWritingColor(b: Building, floor: number, unit: number) {
           </p>
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
             <button
-              onClick={async () => {
-                await supabase.auth.signOut();
-                router.push("/");
-              }}
+              onClick={() => router.push("/explore")}
               style={{
                 fontFamily: "'Crimson Pro', serif", fontWeight: 200,
                 fontSize: "12px", letterSpacing: "0.1em",
-                color: "rgba(255,255,255,0.25)",
+                color: "rgba(255,255,255,0.28)",
                 background: "transparent", border: "none",
                 cursor: "pointer", transition: "color 0.3s",
               }}
-              onMouseEnter={e => (e.currentTarget.style.color = "rgba(255,255,255,0.5)")}
-              onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.25)")}
+              onMouseEnter={e => (e.currentTarget.style.color = "rgba(255,255,255,0.6)")}
+              onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.28)")}
             >
-              로그아웃
+              둘러보기
             </button>
             <button
               onClick={() => router.push("/start")}
