@@ -473,27 +473,46 @@ function getWritingColor(b: Building, floor: number, unit: number) {
           }}>
             still — writing
           </p>
-          <button
-            onClick={() => router.push("/start")}
-            style={{
-              fontFamily: "'Crimson Pro', serif", fontWeight: 200,
-              fontSize: "13px", letterSpacing: "0.1em",
-              color: "rgba(255,255,255,0.5)",
-              background: "transparent", border: "1px solid rgba(255,255,255,0.12)",
-              borderRadius: "100px", padding: "7px 20px", cursor: "pointer",
-              transition: "all 0.4s",
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.color = "rgba(255,255,255,0.9)";
-              e.currentTarget.style.borderColor = "rgba(255,255,255,0.35)";
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.color = "rgba(255,255,255,0.5)";
-              e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)";
-            }}
-          >
-            + 글쓰기
-          </button>
+          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            <button
+              onClick={async () => {
+                await supabase.auth.signOut();
+                router.push("/");
+              }}
+              style={{
+                fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+                fontSize: "12px", letterSpacing: "0.1em",
+                color: "rgba(255,255,255,0.25)",
+                background: "transparent", border: "none",
+                cursor: "pointer", transition: "color 0.3s",
+              }}
+              onMouseEnter={e => (e.currentTarget.style.color = "rgba(255,255,255,0.5)")}
+              onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.25)")}
+            >
+              로그아웃
+            </button>
+            <button
+              onClick={() => router.push("/start")}
+              style={{
+                fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+                fontSize: "13px", letterSpacing: "0.1em",
+                color: "rgba(255,255,255,0.5)",
+                background: "transparent", border: "1px solid rgba(255,255,255,0.12)",
+                borderRadius: "100px", padding: "7px 20px", cursor: "pointer",
+                transition: "all 0.4s",
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.color = "rgba(255,255,255,0.9)";
+                e.currentTarget.style.borderColor = "rgba(255,255,255,0.35)";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.color = "rgba(255,255,255,0.5)";
+                e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)";
+              }}
+            >
+              + 글쓰기
+            </button>
+          </div>
         </nav>
 
         {/* Empty state */}
