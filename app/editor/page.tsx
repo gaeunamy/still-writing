@@ -147,30 +147,33 @@ export default function EditorPage() {
 
     if (mode === "first") {
       if (setup.genre === "시") {
-        prompt = `${setup.mood || "고요한"} 정서, ${setup.speaker || "나"} 화자, ${setup.image || "밤"} 이미지를 담아 감성적인 시를 ${lengthText} 제안해주세요. 직접 이어 쓸 수 있도록 여운을 남겨주세요.`;
+        prompt = `${setup.mood || "고요한"} 정서, ${setup.speaker || "나"} 화자, ${setup.image || "밤"} 이미지를 담아 감성적인 시를 ${lengthText} 제안해주세요. 시처럼 열과 행을 나눠주세요. 직접 이어 쓸 수 있도록 여운을 남겨주세요. 반드시 1문장만 써주세요. 절대 그 이상 쓰지 마세요.`;
       } else if (setup.genre === "소설") {
         prompt = `${setup.view || "1인칭"} 시점, ${setup.setting || "도시"} 배경, ${setup.ending || "열린 결말"} 분위기로 독자가 몰입할 수 있는 소설의 첫 장면을 ${lengthText} 제안해주세요.`;
       } else {
-        prompt = `${setup.mood || "차분한"} 감정으로 오늘의 일기를 ${lengthText} 제안해주세요. 솔직하고 여운 있게.`;
+        prompt = `${setup.mood || "차분한"} 감정으로 오늘 하루를 돌아볼 수 있는 일기 시작 질문 1개만 던져주세요. 짧고 구체적으로, 질문만 써주세요.`;
       }
     } else if (mode === "next") {
       const currentText = content.trim() || "아직 쓴 내용이 없습니다.";
       if (setup.genre === "시") {
-        prompt = `다음은 지금까지 쓴 시입니다:\n\n"${currentText}"\n\n이 흐름에 자연스럽게 이어지는 다음 문장을 ${lengthText} 제안해주세요. 같은 정서와 이미지를 유지해주세요.`;
+        prompt = `다음은 지금까지 쓴 시입니다:\n\n"${currentText}"\n\n이 흐름에 자연스럽게 이어지는 다음 문장을 ${lengthText} 제안해주세요. 같은 정서와 이미지를 유지해주세요. 열과 행도 형태를 유지해주세요.`;
       } else if (setup.genre === "소설") {
         prompt = `다음은 지금까지 쓴 소설입니다:\n\n"${currentText}"\n\n이 장면에서 자연스럽게 이어지는 다음 문장을 ${lengthText} 제안해주세요. 같은 시점과 분위기를 유지해주세요.`;
       } else {
-        prompt = `다음은 지금까지 쓴 일기입니다:\n\n"${currentText}"\n\n이 흐름에 자연스럽게 이어지는 다음 문장을 ${lengthText} 제안해주세요.`;
+        prompt = `다음은 지금까지 쓴 일기입니다:\n\n"${currentText}"\n\n이 내용을 읽고 더 깊이 들어갈 수 있는 질문 1개만 던져주세요. 질문만 써주세요.`;
       }
     } else if (mode === "full") {
       const titleHint = title ? `제목: "${title}"\n` : "";
       const contentHint = content.trim() ? `지금까지 쓴 내용:\n"${content.trim()}"\n\n이 내용을 바탕으로 ` : "";
       if (setup.genre === "시") {
-        prompt = `${titleHint}${contentHint}${setup.mood || "고요한"} 정서, ${setup.speaker || "나"} 화자, ${setup.image || "밤"} 이미지를 담아 완성된 시 한 편을 ${lengthText} 써주세요.`;
+        prompt = `${titleHint}${contentHint}${setup.mood || "고요한"} 정서, ${setup.speaker || "나"} 화자, ${setup.image || "밤"} 이미지를 담아 완성된 시 한 편을 ${lengthText} 써주세요. 시처럼 열과 행을 나눠주세요.`;
       } else if (setup.genre === "소설") {
         prompt = `${titleHint}${contentHint}${setup.view || "1인칭"} 시점, ${setup.setting || "도시"} 배경, ${setup.ending || "열린 결말"} 분위기의 소설 한 편을 ${lengthText} 써주세요.`;
       } else {
-        prompt = `${titleHint}${contentHint}${setup.mood || "차분한"} 감정의 일기를 ${lengthText} 써주세요. 솔직하고 여운 있게.`;
+        // 일기 full → 질문 묶음
+        prompt = `${setup.mood || "차분한"} 감정으로 오늘 하루를 돌아볼 수 있는 일기 작성용 질문 4~5개를 만들어주세요. 
+      각 질문은 짧고 구체적으로, 번호 없이 · 기호로 시작하게 써주세요. 
+      설명이나 부연 없이 질문만 써주세요.`;
       }
     }
 
