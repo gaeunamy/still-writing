@@ -218,16 +218,18 @@ function PostOfficeBuilding({ letterCount, onClick }: { letterCount: number; onC
         border: "0.5px solid rgba(255,220,150,0.1)",
       }} />
 
-      <svg width={bw} height={14} style={{ position: "absolute", top: -12, left: 0 }} viewBox={`0 0 ${bw} 14`}>
+      <svg width={bw} height={14} style={{ position: "absolute", top: -14, left: 0 }} viewBox={`0 0 ${bw} 14`}>
         <polygon points={`0,14 ${bw / 2},0 ${bw},14`} fill="hsl(35,15%,12%)" stroke="rgba(255,220,150,0.1)" strokeWidth="0.5" />
       </svg>
 
-      <div style={{
-        position: "absolute", top: -18, left: "50%",
-        transform: "translateX(-50%)",
-        width: 4, height: 4, borderRadius: "50%",
-        background: "rgba(255,220,100,0.6)",
-        boxShadow: "0 0 6px 2px rgba(255,220,100,0.4)",
+      <div
+        className="roof-glow" 
+        style={{
+          position: "absolute", top: -18, left: "50%",
+          transform: "translateX(-50%)",
+          width: 4, height: 4, borderRadius: "50%",
+          background: "rgba(255,220,100,0.6)",
+          boxShadow: "0 0 6px 2px rgba(255,220,100,0.4)",
       }} />
 
       <div style={{
@@ -392,7 +394,13 @@ function getWritingColor(b: Building, floor: number, unit: number) {
         }}
       >
         <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;1,300&family=Crimson+Pro:wght@200;300&display=swap');
+          @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;1,300&family=Crimson+Pro:wght@200;300&display=swap');\
+
+          @keyframes roofGlow {
+            0%,100% { opacity:0.5; box-shadow: 0 0 5px 3px rgba(255,220,100,0.3); }
+            50%      { opacity:0.85; box-shadow: 0 0 10px 3px rgba(255,220,100,0.6); }
+          }
+          .roof-glow { animation: roofGlow 5s ease-in-out infinite; }
 
           @keyframes twinkle {
             0%,100% { opacity:var(--op); }
