@@ -201,7 +201,7 @@ function PostOfficeBuilding({ letterCount, onClick }: { letterCount: number; onC
     >
       {hovered && (
         <div style={{
-          position: "absolute", top: "-22px", left: "50%",
+          position: "absolute", top: "-35px", left: "50%",
           transform: "translateX(-50%)",
           whiteSpace: "nowrap", pointerEvents: "none", zIndex: 30,
           fontFamily: "'Crimson Pro', serif", fontWeight: 200,
