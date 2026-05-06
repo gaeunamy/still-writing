@@ -36,7 +36,7 @@ const CHAR_LIMITS: Record<string, number> = {
 const FLOORS_PER_BUILDING = 6;
 const UNITS_PER_FLOOR = 2;
 
-async function assignBuildingSlot(genre: string): Promise<{
+async function assignBuildingSlot(genre: string, userId: string | null): Promise<{
   buildingId: string;
   floor: number;
   unit: number;
@@ -46,6 +46,7 @@ async function assignBuildingSlot(genre: string): Promise<{
     .from("buildings")
     .select("id, floor_count, unit_per_floor")
     .eq("genre", genre)
+    .eq("user_id", userId ?? "")
     .order("created_at", { ascending: true });
 
   for (const building of buildings ?? []) {
@@ -76,7 +77,7 @@ async function assignBuildingSlot(genre: string): Promise<{
 
   const { data: newBuilding, error } = await supabase
     .from("buildings")
-    .insert({ genre, name, floor_count: randomFloors, unit_per_floor: UNITS_PER_FLOOR })
+    .insert({ genre, name, floor_count: randomFloors, unit_per_floor: UNITS_PER_FLOOR, user_id: userId })
     .select()
     .single();
 
@@ -210,6 +211,8 @@ export default function EditorPage() {
     setSaving(true);
     setSaveMode(mode);
 
+    const { data: { user } } = await supabase.auth.getUser();
+
     try {
       if (mode === "future") {
         const { error } = await supabase.from("writings").insert({
@@ -220,6 +223,7 @@ export default function EditorPage() {
           is_public: false,
           emotion_color: moodColor,
           open_at: openAt ? new Date(openAt).toISOString() : null,
+          user_id: user?.id ?? null,
         });
         if (error) {
           console.error("Supabase insert error:", JSON.stringify(error));
@@ -227,7 +231,7 @@ export default function EditorPage() {
         }
       } else {
         const genre = setup.genre || "일기";
-        const { buildingId, floor, unit, isNew } = await assignBuildingSlot(genre);
+        const { buildingId, floor, unit, isNew } = await assignBuildingSlot(genre, user?.id ?? null);
         setIsNewBuilding(isNew);
 
         const { error } = await supabase.from("writings").insert({
@@ -240,6 +244,7 @@ export default function EditorPage() {
           building_id: buildingId,
           floor,
           unit,
+          user_id: user?.id ?? null,
         });
         if (error) {
           console.error("Supabase insert error:", JSON.stringify(error));
