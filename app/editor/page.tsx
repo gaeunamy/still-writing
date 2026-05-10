@@ -36,7 +36,7 @@ const CHAR_LIMITS: Record<string, number> = {
 const FLOORS_PER_BUILDING = 6;
 const UNITS_PER_FLOOR = 2;
 
-async function assignBuildingSlot(genre: string, userId: string | null): Promise<{
+async function assignBuildingSlot(genre: string, userId: string | null, forceNew = false): Promise<{
   buildingId: string;
   floor: number;
   unit: number;
@@ -49,24 +49,26 @@ async function assignBuildingSlot(genre: string, userId: string | null): Promise
     .eq("user_id", userId ?? "")
     .order("created_at", { ascending: true });
 
-  for (const building of buildings ?? []) {
-    const { data: writings } = await supabase
-      .from("writings")
-      .select("floor, unit")
-      .eq("building_id", building.id);
+  if (!forceNew) {
+    for (const building of buildings ?? []) {
+      const { data: writings } = await supabase
+        .from("writings")
+        .select("floor, unit")
+        .eq("building_id", building.id);
 
-    const occupied = new Set((writings ?? []).map((w) => `${w.floor}-${w.unit}`));
-    const empty: { floor: number; unit: number }[] = [];
+      const occupied = new Set((writings ?? []).map((w) => `${w.floor}-${w.unit}`));
+      const empty: { floor: number; unit: number }[] = [];
 
-    for (let floor = 1; floor <= building.floor_count; floor++) {
-      for (let unit = 1; unit <= UNITS_PER_FLOOR; unit++) {
-        if (!occupied.has(`${floor}-${unit}`)) empty.push({ floor, unit });
+      for (let floor = 1; floor <= building.floor_count; floor++) {
+        for (let unit = 1; unit <= UNITS_PER_FLOOR; unit++) {
+          if (!occupied.has(`${floor}-${unit}`)) empty.push({ floor, unit });
+        }
       }
-    }
 
-    if (empty.length > 0) {
-      const pick = empty[Math.floor(Math.random() * empty.length)];
-      return { buildingId: building.id, floor: pick.floor, unit: pick.unit, isNew: false };
+      if (empty.length > 0) {
+        const pick = empty[Math.floor(Math.random() * empty.length)];
+        return { buildingId: building.id, floor: pick.floor, unit: pick.unit, isNew: false };
+      }
     }
   }
 
@@ -148,33 +150,30 @@ export default function EditorPage() {
 
     if (mode === "first") {
       if (setup.genre === "시") {
-        prompt = `${setup.mood || "고요한"} 정서, ${setup.speaker || "나"} 화자, ${setup.image || "밤"} 이미지를 담아 감성적인 시를 ${lengthText} 제안해주세요. 시처럼 열과 행을 나눠주세요. 직접 이어 쓸 수 있도록 여운을 남겨주세요. 반드시 1문장만 써주세요. 절대 그 이상 쓰지 마세요.`;
+        prompt = `${setup.mood || "고요한"} 정서, ${setup.speaker || "나"} 화자, ${setup.image || "밤"} 이미지를 담아 감성적인 시를 ${lengthText} 제안해주세요. 직접 이어 쓸 수 있도록 여운을 남겨주세요.`;
       } else if (setup.genre === "소설") {
         prompt = `${setup.view || "1인칭"} 시점, ${setup.setting || "도시"} 배경, ${setup.ending || "열린 결말"} 분위기로 독자가 몰입할 수 있는 소설의 첫 장면을 ${lengthText} 제안해주세요.`;
       } else {
-        prompt = `${setup.mood || "차분한"} 감정으로 오늘 하루를 돌아볼 수 있는 일기 시작 질문 1개만 던져주세요. 짧고 구체적으로, 질문만 써주세요.`;
+        prompt = `${setup.mood || "차분한"} 감정으로 오늘의 일기를 ${lengthText} 제안해주세요. 솔직하고 여운 있게.`;
       }
     } else if (mode === "next") {
       const currentText = content.trim() || "아직 쓴 내용이 없습니다.";
       if (setup.genre === "시") {
-        prompt = `다음은 지금까지 쓴 시입니다:\n\n"${currentText}"\n\n이 흐름에 자연스럽게 이어지는 다음 문장을 ${lengthText} 제안해주세요. 같은 정서와 이미지를 유지해주세요. 열과 행도 형태를 유지해주세요.`;
+        prompt = `다음은 지금까지 쓴 시입니다:\n\n"${currentText}"\n\n이 흐름에 자연스럽게 이어지는 다음 문장을 ${lengthText} 제안해주세요. 같은 정서와 이미지를 유지해주세요.`;
       } else if (setup.genre === "소설") {
         prompt = `다음은 지금까지 쓴 소설입니다:\n\n"${currentText}"\n\n이 장면에서 자연스럽게 이어지는 다음 문장을 ${lengthText} 제안해주세요. 같은 시점과 분위기를 유지해주세요.`;
       } else {
-        prompt = `다음은 지금까지 쓴 일기입니다:\n\n"${currentText}"\n\n이 내용을 읽고 더 깊이 들어갈 수 있는 질문 1개만 던져주세요. 질문만 써주세요.`;
+        prompt = `다음은 지금까지 쓴 일기입니다:\n\n"${currentText}"\n\n이 흐름에 자연스럽게 이어지는 다음 문장을 ${lengthText} 제안해주세요.`;
       }
     } else if (mode === "full") {
       const titleHint = title ? `제목: "${title}"\n` : "";
       const contentHint = content.trim() ? `지금까지 쓴 내용:\n"${content.trim()}"\n\n이 내용을 바탕으로 ` : "";
       if (setup.genre === "시") {
-        prompt = `${titleHint}${contentHint}${setup.mood || "고요한"} 정서, ${setup.speaker || "나"} 화자, ${setup.image || "밤"} 이미지를 담아 완성된 시 한 편을 ${lengthText} 써주세요. 시처럼 열과 행을 나눠주세요.`;
+        prompt = `${titleHint}${contentHint}${setup.mood || "고요한"} 정서, ${setup.speaker || "나"} 화자, ${setup.image || "밤"} 이미지를 담아 완성된 시 한 편을 ${lengthText} 써주세요.`;
       } else if (setup.genre === "소설") {
         prompt = `${titleHint}${contentHint}${setup.view || "1인칭"} 시점, ${setup.setting || "도시"} 배경, ${setup.ending || "열린 결말"} 분위기의 소설 한 편을 ${lengthText} 써주세요.`;
       } else {
-        // 일기 full → 질문 묶음
-        prompt = `${setup.mood || "차분한"} 감정으로 오늘 하루를 돌아볼 수 있는 일기 작성용 질문 4~5개를 만들어주세요. 
-      각 질문은 짧고 구체적으로, 번호 없이 · 기호로 시작하게 써주세요. 
-      설명이나 부연 없이 질문만 써주세요.`;
+        prompt = `${titleHint}${contentHint}${setup.mood || "차분한"} 감정의 일기를 ${lengthText} 써주세요. 솔직하고 여운 있게.`;
       }
     }
 
@@ -198,22 +197,44 @@ export default function EditorPage() {
     setAiExpanded(false);
   };
 
-  const handleSave = async (mode: SaveMode, openAt?: string) => {
+  const [showBuildModal, setShowBuildModal] = useState(false);
+  const [pendingSave, setPendingSave] = useState<{ mode: SaveMode; openAt?: string } | null>(null);
+  const [genreCount, setGenreCount] = useState(0);
+
+  const handleSave = async (mode: SaveMode, openAt?: string, forceNew = false) => {
     if (!content.trim()) return;
 
-    // 미래의 나에게 — 날짜 선택 먼저
     if (mode === "future" && !openAt) {
       setSaveMode("future");
       setShowDatePicker(true);
       return;
     }
 
+    // 6편 체크 (future 제외)
+    if (mode !== "future" && !forceNew && pendingSave === null) {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { count } = await supabase
+        .from("writings")
+        .select("id", { count: "exact", head: true })
+        .eq("genre", setup.genre || "일기")
+        .eq("user_id", user?.id ?? "")
+        .is("open_at", null);
+
+      const currentCount = (count ?? 0) + 1;
+      if (currentCount % 6 === 0) {
+        setGenreCount(currentCount);
+        setPendingSave({ mode, openAt });
+        setShowBuildModal(true);
+        return;
+      }
+    }
+
     setSaving(true);
     setSaveMode(mode);
 
-    const { data: { user } } = await supabase.auth.getUser();
-
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+
       if (mode === "future") {
         const { error } = await supabase.from("writings").insert({
           title: title || null,
@@ -231,7 +252,7 @@ export default function EditorPage() {
         }
       } else {
         const genre = setup.genre || "일기";
-        const { buildingId, floor, unit, isNew } = await assignBuildingSlot(genre, user?.id ?? null);
+        const { buildingId, floor, unit, isNew } = await assignBuildingSlot(genre, user?.id ?? null, forceNew);
         setIsNewBuilding(isNew);
 
         const { error } = await supabase.from("writings").insert({
@@ -259,6 +280,7 @@ export default function EditorPage() {
       ]));
 
       setSaved(true);
+      setPendingSave(null);
       setTimeout(() => router.push("/city"), 2400);
     } catch (e) {
       console.error("Save error:", e);
@@ -625,6 +647,110 @@ export default function EditorPage() {
                 }}
               >
                 우체국에 맡기기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* 새 건물 짓기 모달 */}
+      {showBuildModal && pendingSave && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 50,
+            background: "rgba(3,1,10,0.88)", backdropFilter: "blur(14px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "24px",
+          }}
+        >
+          <div
+            className="modal-in"
+            style={{
+              background: "rgba(15,8,30,0.96)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: "24px", padding: "40px 44px",
+              maxWidth: "440px", width: "100%",
+            }}
+          >
+            <p style={{
+              fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+              fontSize: "11px", letterSpacing: "0.38em", textTransform: "uppercase",
+              color: "rgba(255,255,255,0.3)", marginBottom: "12px",
+            }}>
+              건축 권한 획득
+            </p>
+            <h2 style={{
+              fontFamily: "'Cormorant Garamond', serif", fontWeight: 300,
+              fontSize: "22px", color: "rgba(255,255,255,0.88)",
+              marginBottom: "12px",
+            }}>
+              새 건물을 지을 수 있어요
+            </h2>
+            <p style={{
+              fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+              fontSize: "13px", color: "rgba(255,255,255,0.45)",
+              lineHeight: 1.7, marginBottom: "10px",
+            }}>
+              {setup.genre}를 {genreCount}편 완성했습니다.
+            </p>
+            <p style={{
+              fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+              fontSize: "12px", color: "rgba(255,255,255,0.28)",
+              lineHeight: 1.7, marginBottom: "32px",
+            }}>
+              새 건물을 지으면 이곳에 입주하며,<br />
+              건물 간 이사는 언제든 가능합니다.
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              <button
+                onClick={() => {
+                  setShowBuildModal(false);
+                  handleSave(pendingSave.mode, pendingSave.openAt, true);
+                }}
+                style={{
+                  fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+                  fontSize: "14px", letterSpacing: "0.08em",
+                  padding: "13px 24px", borderRadius: "100px",
+                  border: "1px solid rgba(255,255,255,0.25)",
+                  background: "rgba(255,255,255,0.06)",
+                  color: "rgba(255,255,255,0.88)",
+                  cursor: "pointer", transition: "all 0.3s",
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.borderColor = "rgba(255,255,255,0.45)";
+                  e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.borderColor = "rgba(255,255,255,0.25)";
+                  e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+                }}
+              >
+                새 건물 짓기
+              </button>
+              <button
+                onClick={() => {
+                  setShowBuildModal(false);
+                  handleSave(pendingSave.mode, pendingSave.openAt, false);
+                }}
+                style={{
+                  fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+                  fontSize: "13px", letterSpacing: "0.08em",
+                  padding: "11px 24px", borderRadius: "100px",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  background: "transparent",
+                  color: "rgba(255,255,255,0.45)",
+                  cursor: "pointer", transition: "all 0.3s",
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.borderColor = "rgba(255,255,255,0.25)";
+                  e.currentTarget.style.color = "rgba(255,255,255,0.7)";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)";
+                  e.currentTarget.style.color = "rgba(255,255,255,0.45)";
+                }}
+              >
+                기존 건물에 입주
               </button>
             </div>
           </div>
