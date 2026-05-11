@@ -6,6 +6,16 @@ import { supabase } from "../../../lib/supabase";
 import { Toast, useToast } from "../../components/Toast";
 import AuthGuard from "../../components/AuthGuard";
 
+function getJosa(text: string, josa: "이/가" | "을/를" | "은/는"): string {
+  const last = text[text.length - 1];
+  const code = last.charCodeAt(0);
+  const hasBatchim = (code - 0xAC00) % 28 !== 0;
+  if (josa === "이/가") return hasBatchim ? "이" : "가";
+  if (josa === "을/를") return hasBatchim ? "을" : "를";
+  if (josa === "은/는") return hasBatchim ? "은" : "는";
+  return "";
+}
+
 type Writing = {
   id: string;
   title: string | null;
@@ -756,8 +766,10 @@ export default function BuildingPage() {
                   fontSize: "13px", color: "rgba(255,255,255,0.35)",
                   lineHeight: 1.7, marginBottom: "32px",
                 }}>
-                  "{confirmDelete.title || "제목 없음"}"이 도시에서 사라집니다.<br />
-                  이 창문의 불도 꺼집니다.
+                  {(() => {
+                    const t = confirmDelete.title || "제목 없음";
+                    return `"${t}"${getJosa(t, "이/가")} 도시에서 사라집니다.`;
+                  })()}
                 </p>
 
                 <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
