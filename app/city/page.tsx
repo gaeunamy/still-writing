@@ -69,7 +69,7 @@ function getWindowColor(floor: number, unit: number, emotionColor?: string | nul
 
 // 건물 블록 컴포넌트
 function BuildingBlock({
-  b, bi, risingId, floatingLabel, hoveredId, setHoveredId, onCityClick,
+  b, bi, risingId, hoveredId, setHoveredId, onCityClick,
   isWindowLit, getWritingColor,
 }: {
   b: Building;
@@ -86,7 +86,6 @@ function BuildingBlock({
   const bw = GENRE_WIDTH[b.genre] ?? 50;
   const accentColor = GENRE_COLOR[b.genre] ?? "#c8c0b0";
   const isNew = risingId === b.id;
-  const showFloat = floatingLabel?.id === b.id;
   const isHovered = hoveredId === b.id;
 
   return (
@@ -106,20 +105,6 @@ function BuildingBlock({
         transition: "transform 0.3s ease",
       }}
     >
-      {showFloat && (
-        <div className="float-label" style={{
-          position: "absolute", top: "-32px", left: "50%",
-          whiteSpace: "nowrap", pointerEvents: "none", zIndex: 30,
-          fontFamily: "'Crimson Pro', serif", fontWeight: 200,
-          fontSize: "11px", letterSpacing: "0.08em",
-          color: "rgba(255,255,255,0.55)",
-          background: "rgba(10,5,25,0.7)",
-          padding: "3px 10px", borderRadius: "20px",
-          border: "1px solid rgba(255,255,255,0.08)",
-        }}>
-          {floatingLabel!.text}
-        </div>
-      )}
 
       {isHovered && (
         <div style={{
@@ -604,6 +589,30 @@ function getWritingColor(b: Building, floor: number, unit: number) {
             </div>
           )}
         </div>
+
+        {/* Floating label 화면 중앙 고정 */}
+        {floatingLabel && (
+          <div
+            className="float-label"
+            style={{
+              position: "fixed",
+              bottom: "200px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              whiteSpace: "nowrap",
+              pointerEvents: "none",
+              zIndex: 30,
+              fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+              fontSize: "11px", letterSpacing: "0.08em",
+              color: "rgba(255,255,255,0.55)",
+              background: "rgba(10,5,25,0.7)",
+              padding: "3px 10px", borderRadius: "20px",
+              border: "1px solid rgba(255,255,255,0.08)",
+            }}
+          >
+            {floatingLabel.text}
+          </div>
+        )}
       </main>
     </AuthGuard>
   );
