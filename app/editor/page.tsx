@@ -112,8 +112,23 @@ export default function EditorPage() {
   const [saveMode, setSaveMode] = useState<SaveMode>(null);
   const [saved, setSaved] = useState(false);
   const [isNewBuilding, setIsNewBuilding] = useState(false);
+
+  // 날짜 모달
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
+
+  // 제목 모달
+  const [showTitleModal, setShowTitleModal] = useState(false);
+  const [pendingSaveMode, setPendingSaveMode] = useState<SaveMode>(null);
+
+  // 건물 모달
+  const [showBuildModal, setShowBuildModal] = useState(false);
+  const [pendingSave, setPendingSave] = useState<{ mode: SaveMode; openAt?: string } | null>(null);
+  const [genreCount, setGenreCount] = useState(0);
+
+  // AI
+  const [aiExpanded, setAiExpanded] = useState(false);
+  const [aiMode, setAiMode] = useState<"first" | "next" | "full" | null>(null);
 
   const [setup, setSetup] = useState<WritingSetup>({
     genre: "", mood: "", speaker: "", image: "",
@@ -131,9 +146,6 @@ export default function EditorPage() {
   const moodColor = MOOD_COLORS[setup.mood] ?? "#a0a8b8";
   const charLimit = CHAR_LIMITS[setup.length] ?? 500;
 
-  const [aiExpanded, setAiExpanded] = useState(false);
-  const [aiMode, setAiMode] = useState<"first" | "next" | "full" | null>(null);
-
   const handleGenerate = async (mode: "first" | "next" | "full") => {
     if (!setup.genre) return;
     setAiMode(mode);
@@ -150,11 +162,11 @@ export default function EditorPage() {
 
     if (mode === "first") {
       if (setup.genre === "시") {
-        prompt = `${setup.mood || "고요한"} 정서, ${setup.speaker || "나"} 화자, ${setup.image || "밤"} 이미지를 담아 감성적인 시를 ${lengthText} 제안해주세요. 직접 이어 쓸 수 있도록 여운을 남겨주세요.`;
+        prompt = `${setup.mood || "고요한"} 정서, ${setup.speaker || "나"} 화자, ${setup.image || "밤"} 이미지를 담아 감성적인 시를 ${lengthText} 제안해주세요. 직접 이어 쓸 수 있도록 여운을 남겨주세요. 반드시 1~2문장만 써주세요.`;
       } else if (setup.genre === "소설") {
-        prompt = `${setup.view || "1인칭"} 시점, ${setup.setting || "도시"} 배경, ${setup.ending || "열린 결말"} 분위기로 독자가 몰입할 수 있는 소설의 첫 장면을 ${lengthText} 제안해주세요.`;
+        prompt = `${setup.view || "1인칭"} 시점, ${setup.setting || "도시"} 배경, ${setup.ending || "열린 결말"} 분위기로 독자가 몰입할 수 있는 소설의 첫 장면을 ${lengthText} 제안해주세요. 반드시 1~2문장만 써주세요.`;
       } else {
-        prompt = `${setup.mood || "차분한"} 감정으로 오늘의 일기를 ${lengthText} 제안해주세요. 솔직하고 여운 있게.`;
+        prompt = `${setup.mood || "차분한"} 감정으로 오늘 하루를 돌아볼 수 있는 일기 시작 질문 1개만 던져주세요. 짧고 구체적으로, 질문만 써주세요.`;
       }
     } else if (mode === "next") {
       const currentText = content.trim() || "아직 쓴 내용이 없습니다.";
@@ -163,7 +175,7 @@ export default function EditorPage() {
       } else if (setup.genre === "소설") {
         prompt = `다음은 지금까지 쓴 소설입니다:\n\n"${currentText}"\n\n이 장면에서 자연스럽게 이어지는 다음 문장을 ${lengthText} 제안해주세요. 같은 시점과 분위기를 유지해주세요.`;
       } else {
-        prompt = `다음은 지금까지 쓴 일기입니다:\n\n"${currentText}"\n\n이 흐름에 자연스럽게 이어지는 다음 문장을 ${lengthText} 제안해주세요.`;
+        prompt = `다음은 지금까지 쓴 일기입니다:\n\n"${currentText}"\n\n이 내용을 읽고 더 깊이 들어갈 수 있는 질문 1개만 던져주세요. 질문만 써주세요.`;
       }
     } else if (mode === "full") {
       const titleHint = title ? `제목: "${title}"\n` : "";
@@ -173,7 +185,7 @@ export default function EditorPage() {
       } else if (setup.genre === "소설") {
         prompt = `${titleHint}${contentHint}${setup.view || "1인칭"} 시점, ${setup.setting || "도시"} 배경, ${setup.ending || "열린 결말"} 분위기의 소설 한 편을 ${lengthText} 써주세요.`;
       } else {
-        prompt = `${titleHint}${contentHint}${setup.mood || "차분한"} 감정의 일기를 ${lengthText} 써주세요. 솔직하고 여운 있게.`;
+        prompt = `${setup.mood || "차분한"} 감정으로 오늘 하루를 돌아볼 수 있는 일기 작성용 질문 4~5개를 만들어주세요. 번호 없이 · 기호로 시작하게 써주세요. 질문만 써주세요.`;
       }
     }
 
@@ -181,7 +193,7 @@ export default function EditorPage() {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, length: setup.length || "적당히" }),
+        body: JSON.stringify({ prompt, length: setup.length || "적당히", mode }),
       });
       const data = await res.json();
       if (data.result) {
@@ -197,20 +209,24 @@ export default function EditorPage() {
     setAiExpanded(false);
   };
 
-  const [showBuildModal, setShowBuildModal] = useState(false);
-  const [pendingSave, setPendingSave] = useState<{ mode: SaveMode; openAt?: string } | null>(null);
-  const [genreCount, setGenreCount] = useState(0);
-
   const handleSave = async (mode: SaveMode, openAt?: string, forceNew = false) => {
     if (!content.trim()) return;
 
+    // 1. 제목 없으면 모달
+    if (!title.trim() && !showTitleModal && pendingSaveMode === null) {
+      setPendingSaveMode(mode);
+      setShowTitleModal(true);
+      return;
+    }
+
+    // 2. 미래의 나에게 — 날짜 선택
     if (mode === "future" && !openAt) {
       setSaveMode("future");
       setShowDatePicker(true);
       return;
     }
 
-    // 6편 체크 (future 제외)
+    // 3. 6편 체크
     if (mode !== "future" && !forceNew && pendingSave === null) {
       const { data: { user } } = await supabase.auth.getUser();
       const { count } = await supabase
@@ -234,10 +250,13 @@ export default function EditorPage() {
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      
+      // 비동기 타이밍 이슈 방지를 위해 최종 저장 제목 가공 처리
+      const finalTitle = title.trim() || "[無題]";
 
       if (mode === "future") {
         const { error } = await supabase.from("writings").insert({
-          title: title || null,
+          title: finalTitle,
           content,
           genre: setup.genre || "일기",
           mood: setup.mood || null,
@@ -246,17 +265,14 @@ export default function EditorPage() {
           open_at: openAt ? new Date(openAt).toISOString() : null,
           user_id: user?.id ?? null,
         });
-        if (error) {
-          console.error("Supabase insert error:", JSON.stringify(error));
-          throw error;
-        }
+        if (error) { console.error("Supabase insert error:", JSON.stringify(error)); throw error; }
       } else {
         const genre = setup.genre || "일기";
         const { buildingId, floor, unit, isNew } = await assignBuildingSlot(genre, user?.id ?? null, forceNew);
         setIsNewBuilding(isNew);
 
         const { error } = await supabase.from("writings").insert({
-          title: title || null,
+          title: finalTitle,
           content,
           genre,
           mood: setup.mood || null,
@@ -267,15 +283,12 @@ export default function EditorPage() {
           unit,
           user_id: user?.id ?? null,
         });
-        if (error) {
-          console.error("Supabase insert error:", JSON.stringify(error));
-          throw error;
-        }
+        if (error) { console.error("Supabase insert error:", JSON.stringify(error)); throw error; }
       }
 
       const local = JSON.parse(localStorage.getItem("savedWritings") || "[]");
       localStorage.setItem("savedWritings", JSON.stringify([
-        { id: Date.now(), title, content, createdAt: new Date().toISOString(), mode },
+        { id: Date.now(), title: finalTitle, content, createdAt: new Date().toISOString(), mode },
         ...local,
       ]));
 
@@ -473,14 +486,11 @@ export default function EditorPage() {
               color: "rgba(255,255,255,0.8)", resize: "none",
             }}
           />
-          {/* 글자 수 카운터 */}
           <p style={{
             textAlign: "right", marginTop: "8px",
             fontFamily: "'Crimson Pro', serif", fontWeight: 200,
             fontSize: "12px", letterSpacing: "0.04em",
-            color: content.length >= charLimit
-              ? "rgba(255,120,120,0.7)"
-              : "rgba(255,255,255,0.2)",
+            color: content.length >= charLimit ? "rgba(255,120,120,0.7)" : "rgba(255,255,255,0.2)",
           }}>
             {content.length} / {charLimit}
           </p>
@@ -533,7 +543,110 @@ export default function EditorPage() {
         )}
       </div>
 
-      {/* 날짜 선택 모달 */}
+      {/* ── 제목 모달 ── */}
+      {showTitleModal && (
+        <div
+          onClick={() => setShowTitleModal(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 50,
+            background: "rgba(3,1,10,0.88)", backdropFilter: "blur(14px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "24px",
+          }}
+        >
+          <div
+            className="modal-in"
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: "rgba(15,8,30,0.96)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: "24px", padding: "40px 44px",
+              maxWidth: "420px", width: "100%",
+            }}
+          >
+            <h2 style={{
+              fontFamily: "'Cormorant Garamond', serif", fontWeight: 300,
+              fontSize: "22px", color: "rgba(255,255,255,0.88)", marginBottom: "8px",
+            }}>
+              제목을 정할까요?
+            </h2>
+            <p style={{
+              fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+              fontSize: "13px", color: "rgba(255,255,255,0.35)",
+              marginBottom: "24px", lineHeight: 1.6,
+            }}>
+              제목 없이 저장하면 무제(無題)로 기록됩니다
+            </p>
+
+            <input
+              type="text"
+              placeholder="제목을 입력해주세요"
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter") {
+                  if (!title.trim()) setTitle("[無題]");
+                  setShowTitleModal(false);
+                  setTimeout(() => {
+                    handleSave(pendingSaveMode!);
+                    setPendingSaveMode(null);
+                  }, 0);
+                }
+              }}
+              style={{
+                width: "100%",
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.1)",
+                borderRadius: "12px", padding: "12px 16px",
+                fontFamily: "'Cormorant Garamond', serif", fontWeight: 300,
+                fontSize: "16px", color: "rgba(255,255,255,0.8)",
+                outline: "none", marginBottom: "20px",
+                boxSizing: "border-box",
+              }}
+              autoFocus
+            />
+
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => { setShowTitleModal(false); setPendingSaveMode(null); }}
+                style={{
+                  fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+                  fontSize: "12px", letterSpacing: "0.06em",
+                  padding: "9px 18px", borderRadius: "100px",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  background: "transparent", color: "rgba(255,255,255,0.35)",
+                  cursor: "pointer",
+                }}
+              >
+                취소
+              </button>
+              <button
+                onClick={() => {
+                  if (!title.trim()) setTitle("[無題]");
+                  setShowTitleModal(false);
+                  setTimeout(() => {
+                    handleSave(pendingSaveMode!);
+                    setPendingSaveMode(null);
+                  }, 0);
+                }}
+                style={{
+                  fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+                  fontSize: "13px", letterSpacing: "0.06em",
+                  padding: "9px 24px", borderRadius: "100px",
+                  border: "1px solid rgba(255,255,255,0.2)",
+                  background: "rgba(255,255,255,0.06)",
+                  color: "rgba(255,255,255,0.88)",
+                  cursor: "pointer",
+                }}
+              >
+                저장
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 날짜 선택 모달 ── */}
       {showDatePicker && (
         <div
           onClick={() => setShowDatePicker(false)}
@@ -563,8 +676,7 @@ export default function EditorPage() {
             </p>
             <h2 style={{
               fontFamily: "'Cormorant Garamond', serif", fontWeight: 300,
-              fontSize: "22px", color: "rgba(255,255,255,0.88)",
-              marginBottom: "8px",
+              fontSize: "22px", color: "rgba(255,255,255,0.88)", marginBottom: "8px",
             }}>
               언제 열어볼까요?
             </h2>
@@ -576,7 +688,6 @@ export default function EditorPage() {
               그날이 되면 우체국에서 편지가 기다리고 있을 거예요
             </p>
 
-            {/* 빠른 선택 */}
             <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "24px" }}>
               {DATE_PRESETS.map(preset => (
                 <button
@@ -589,7 +700,6 @@ export default function EditorPage() {
               ))}
             </div>
 
-            {/* 직접 입력 */}
             <div style={{ marginBottom: "32px" }}>
               <p style={{
                 fontFamily: "'Crimson Pro', serif", fontWeight: 200,
@@ -624,7 +734,7 @@ export default function EditorPage() {
                   padding: "10px 20px", borderRadius: "100px",
                   border: "1px solid rgba(255,255,255,0.08)",
                   background: "transparent", color: "rgba(255,255,255,0.35)",
-                  cursor: "pointer", transition: "all 0.3s",
+                  cursor: "pointer",
                 }}
               >
                 취소
@@ -643,7 +753,6 @@ export default function EditorPage() {
                   background: selectedDate ? "rgba(255,255,255,0.06)" : "transparent",
                   color: selectedDate ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.25)",
                   cursor: selectedDate ? "pointer" : "default",
-                  transition: "all 0.3s",
                 }}
               >
                 우체국에 맡기기
@@ -652,7 +761,8 @@ export default function EditorPage() {
           </div>
         </div>
       )}
-      {/* 새 건물 짓기 모달 */}
+
+      {/* ── 새 건물 짓기 모달 ── */}
       {showBuildModal && pendingSave && (
         <div
           style={{
@@ -680,8 +790,7 @@ export default function EditorPage() {
             </p>
             <h2 style={{
               fontFamily: "'Cormorant Garamond', serif", fontWeight: 300,
-              fontSize: "22px", color: "rgba(255,255,255,0.88)",
-              marginBottom: "12px",
+              fontSize: "22px", color: "rgba(255,255,255,0.88)", marginBottom: "12px",
             }}>
               새 건물을 지을 수 있어요
             </h2>
