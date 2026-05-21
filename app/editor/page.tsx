@@ -42,6 +42,45 @@ async function assignBuildingSlot(genre: string, userId: string | null, forceNew
   unit: number;
   isNew: boolean;
 }> {
+  const latestBuildingId = localStorage.getItem(`latestBuilding_${genre}`);
+  console.log("🏢 latestBuildingId:", latestBuildingId);
+  
+  // 최근 건물이 있고 새 건물을 강제로 만드는 것이 아니면 먼저 확인
+  if (latestBuildingId && !forceNew) {
+    const { data: latestBuilding } = await supabase
+      .from("buildings")
+      .select("id, floor_count, unit_per_floor")
+      .eq("id", latestBuildingId)
+      .single();
+
+    console.log("🏢 latestBuilding found:", latestBuilding);
+
+    if (latestBuilding) {
+      const { data: writings } = await supabase
+        .from("writings")
+        .select("floor, unit")
+        .eq("building_id", latestBuilding.id);
+
+      const occupied = new Set((writings ?? []).map((w) => `${w.floor}-${w.unit}`));
+      const empty: { floor: number; unit: number }[] = [];
+
+      for (let floor = 1; floor <= latestBuilding.floor_count; floor++) {
+        for (let unit = 1; unit <= UNITS_PER_FLOOR; unit++) {
+          if (!occupied.has(`${floor}-${unit}`)) empty.push({ floor, unit });
+        }
+      }
+
+      console.log("🏢 empty slots in latest building:", empty);
+
+      if (empty.length > 0) {
+        const pick = empty[Math.floor(Math.random() * empty.length)];
+        console.log("✅ Assigned to latest building:", pick);
+        return { buildingId: latestBuilding.id, floor: pick.floor, unit: pick.unit, isNew: false };
+      }
+    }
+  }
+
+  // 기존 건물들 확인
   const { data: buildings } = await supabase
     .from("buildings")
     .select("id, floor_count, unit_per_floor")
@@ -72,6 +111,7 @@ async function assignBuildingSlot(genre: string, userId: string | null, forceNew
     }
   }
 
+  // 새 건물 생성
   const genreNames: Record<string, string> = { 시: "시집", 소설: "소설관", 일기: "일기탑" };
   const count = (buildings ?? []).length;
   const name = `${genreNames[genre] ?? genre} ${count + 1}호`;
@@ -84,6 +124,10 @@ async function assignBuildingSlot(genre: string, userId: string | null, forceNew
     .single();
 
   if (error || !newBuilding) throw new Error("건물 생성 실패");
+
+  // 새 건물을 만들면 바로 localStorage에 저장
+  localStorage.setItem(`latestBuilding_${genre}`, newBuilding.id);
+  console.log("✅ New building created and saved:", newBuilding.id);
 
   const firstUnit = Math.random() < 0.5 ? 1 : 2;
   return { buildingId: newBuilding.id, floor: 1, unit: firstUnit, isNew: true };
@@ -141,6 +185,27 @@ export default function EditorPage() {
     const genre = localStorage.getItem("selectedGenre");
     if (!genre) router.push("/start");
     else setSetup((prev) => ({ ...prev, genre: prev.genre || genre }));
+
+    // 페이지 로드 시 최신 건물 ID를 localStorage에 초기화
+    if (genre) {
+      const initLatestBuilding = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: latestBuilding } = await supabase
+          .from("buildings")
+          .select("id")
+          .eq("genre", genre)
+          .eq("user_id", user?.id ?? "")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+
+        if (latestBuilding?.id) {
+          localStorage.setItem(`latestBuilding_${genre}`, latestBuilding.id);
+          console.log("✅ Latest building initialized:", latestBuilding.id);
+        }
+      };
+      initLatestBuilding();
+    }
   }, []);
 
   const moodColor = MOOD_COLORS[setup.mood] ?? "#a0a8b8";
@@ -270,6 +335,8 @@ export default function EditorPage() {
         const genre = setup.genre || "일기";
         const { buildingId, floor, unit, isNew } = await assignBuildingSlot(genre, user?.id ?? null, forceNew);
         setIsNewBuilding(isNew);
+
+        // assignBuildingSlot 함수 내에서 이미 localStorage에 저장되므로 중복 저장 제거
 
         const { error } = await supabase.from("writings").insert({
           title: finalTitle,
@@ -762,7 +829,7 @@ export default function EditorPage() {
         </div>
       )}
 
-      {/* ── 새 건물 짓기 모달 ── */}
+      {/* ── 새 건물 짓기 모달 ── */}
       {showBuildModal && pendingSave && (
         <div
           style={{
