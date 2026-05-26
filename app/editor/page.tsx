@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
+import { Toast, useToast } from "../../components/Toast";
+import AuthGuard from "../../components/AuthGuard";
 
 type WritingSetup = {
   genre: string;
@@ -45,7 +47,6 @@ async function assignBuildingSlot(genre: string, userId: string | null, forceNew
   const latestBuildingId = localStorage.getItem(`latestBuilding_${genre}`);
   console.log("🏢 latestBuildingId:", latestBuildingId);
   
-  // 최근 건물이 있고 새 건물을 강제로 만드는 것이 아니면 먼저 확인
   if (latestBuildingId && !forceNew) {
     const { data: latestBuilding } = await supabase
       .from("buildings")
@@ -80,7 +81,6 @@ async function assignBuildingSlot(genre: string, userId: string | null, forceNew
     }
   }
 
-  // 기존 건물들 확인
   const { data: buildings } = await supabase
     .from("buildings")
     .select("id, floor_count, unit_per_floor")
@@ -111,7 +111,6 @@ async function assignBuildingSlot(genre: string, userId: string | null, forceNew
     }
   }
 
-  // 새 건물 생성
   const genreNames: Record<string, string> = { 시: "시집", 소설: "소설관", 일기: "일기탑" };
   const count = (buildings ?? []).length;
   const name = `${genreNames[genre] ?? genre} ${count + 1}호`;
@@ -125,7 +124,6 @@ async function assignBuildingSlot(genre: string, userId: string | null, forceNew
 
   if (error || !newBuilding) throw new Error("건물 생성 실패");
 
-  // 새 건물을 만들면 바로 localStorage에 저장
   localStorage.setItem(`latestBuilding_${genre}`, newBuilding.id);
   console.log("✅ New building created and saved:", newBuilding.id);
 
@@ -157,22 +155,18 @@ export default function EditorPage() {
   const [saved, setSaved] = useState(false);
   const [isNewBuilding, setIsNewBuilding] = useState(false);
 
-  // 날짜 모달
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
 
-  // 제목 모달
   const [showTitleModal, setShowTitleModal] = useState(false);
   const [pendingSaveMode, setPendingSaveMode] = useState<SaveMode>(null);
 
-  // 건물 모달
   const [showBuildModal, setShowBuildModal] = useState(false);
   const [pendingSave, setPendingSave] = useState<{ mode: SaveMode; openAt?: string } | null>(null);
   const [genreCount, setGenreCount] = useState(0);
 
-  // AI
   const [aiExpanded, setAiExpanded] = useState(false);
-  const [aiMode, setAiMode] = useState<"first" | "next" | "full" | null>(null);
+  const [aiMode, setAiMode] = useState<"first" | "next" | "full" | "question" | null>(null);
 
   const [setup, setSetup] = useState<WritingSetup>({
     genre: "", mood: "", speaker: "", image: "",
@@ -186,7 +180,6 @@ export default function EditorPage() {
     if (!genre) router.push("/start");
     else setSetup((prev) => ({ ...prev, genre: prev.genre || genre }));
 
-    // 페이지 로드 시 최신 건물 ID를 localStorage에 초기화
     if (genre) {
       const initLatestBuilding = async () => {
         const { data: { user } } = await supabase.auth.getUser();
@@ -210,8 +203,9 @@ export default function EditorPage() {
 
   const moodColor = MOOD_COLORS[setup.mood] ?? "#a0a8b8";
   const charLimit = CHAR_LIMITS[setup.length] ?? 500;
+  const isDiary = setup.genre === "일기";
 
-  const handleGenerate = async (mode: "first" | "next" | "full") => {
+  const handleGenerate = async (mode: "first" | "next" | "full" | "question") => {
     if (!setup.genre) return;
     setAiMode(mode);
     setLoading(true);
@@ -225,13 +219,11 @@ export default function EditorPage() {
 
     let prompt = "";
 
-if (mode === "first") {
+    if (mode === "first") {
       if (setup.genre === "시") {
         prompt = `${setup.speaker || "나"} 화자, ${setup.image || "밤"} 이미지를 담아 감성적인 시를 ${lengthText} 제안해주세요. 직접 이어 쓸 수 있도록 여운을 남겨주세요. 반드시 1~2문장만 써주세요.`;
       } else if (setup.genre === "소설") {
         prompt = `${setup.view || "1인칭"} 시점, ${setup.setting || "도시"} 배경, ${setup.ending || "열린 결말"} 분위기로 독자가 몰입할 수 있는 소설의 첫 장면을 ${lengthText} 제안해주세요. 반드시 1~2문장만 써주세요.`;
-      } else {
-        prompt = `오늘 하루를 돌아볼 수 있는 일기 시작 질문 1개만 던져주세요. 짧고 구체적으로, 질문만 써주세요.`;
       }
     } else if (mode === "next") {
       const currentText = content.trim() || "아직 쓴 내용이 없습니다.";
@@ -239,8 +231,6 @@ if (mode === "first") {
         prompt = `다음은 지금까지 쓴 시입니다:\n\n"${currentText}"\n\n이 흐름에 자연스럽게 이어지는 다음 문장을 ${lengthText} 제안해주세요. 같은 이미지와 감정을 유지해주세요.`;
       } else if (setup.genre === "소설") {
         prompt = `다음은 지금까지 쓴 소설입니다:\n\n"${currentText}"\n\n이 장면에서 자연스럽게 이어지는 다음 문장을 ${lengthText} 제안해주세요. 같은 시점과 분위기를 유지해주세요.`;
-      } else {
-        prompt = `다음은 지금까지 쓴 일기입니다:\n\n"${currentText}"\n\n이 내용을 읽고 더 깊이 들어갈 수 있는 질문 1개만 던져주세요. 질문만 써주세요.`;
       }
     } else if (mode === "full") {
       const titleHint = title ? `제목: "${title}"\n` : "";
@@ -249,9 +239,17 @@ if (mode === "first") {
         prompt = `${titleHint}${contentHint}${setup.speaker || "나"} 화자, ${setup.image || "밤"} 이미지를 담아 완성된 시 한 편을 ${lengthText} 써주세요.`;
       } else if (setup.genre === "소설") {
         prompt = `${titleHint}${contentHint}${setup.view || "1인칭"} 시점, ${setup.setting || "도시"} 배경, ${setup.ending || "열린 결말"} 분위기의 소설 한 편을 ${lengthText} 써주세요.`;
-      } else {
-        prompt = `${titleHint}${contentHint}오늘 하루를 돌아볼 수 있는 일기 작성용 질문 4~5개를 만들어주세요. 번호 없이 · 기호로 시작하게 써주세요. 질문만 써주세요.`;
       }
+    } else if (mode === "question") {
+      // 일기 질문 생성
+      const contentHint = content.trim() ? `지금까지 쓴 내용:\n"${content.trim()}"\n\n이를 바탕으로 ` : "";
+      prompt = `${contentHint}오늘 하루를 더 깊이 있게 돌아볼 수 있는 질문 1개만 던져주세요. 짧고 구체적으로, 질문만 써주세요.`;
+    }
+
+    if (!prompt) {
+      setLoading(false);
+      setAiMode(null);
+      return;
     }
 
     try {
@@ -277,21 +275,18 @@ if (mode === "first") {
   const handleSave = async (mode: SaveMode, openAt?: string, forceNew = false) => {
     if (!content.trim()) return;
 
-    // 1. 제목 없으면 모달
     if (!title.trim() && !showTitleModal && pendingSaveMode === null) {
       setPendingSaveMode(mode);
       setShowTitleModal(true);
       return;
     }
 
-    // 2. 미래의 나에게 — 날짜 선택
     if (mode === "future" && !openAt) {
       setSaveMode("future");
       setShowDatePicker(true);
       return;
     }
 
-    // 3. 6편 체크
     if (mode !== "future" && !forceNew && pendingSave === null) {
       const { data: { user } } = await supabase.auth.getUser();
       const { count } = await supabase
@@ -316,10 +311,8 @@ if (mode === "first") {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
-      // 비동기 타이밍 이슈 방지를 위해 최종 저장 제목 가공 처리
       const finalTitle = title.trim() || "[無題]";
 
-      // AI가 글의 mood를 분석
       let analyzedMood = setup.mood || null;
       let analyzedColor = moodColor;
 
@@ -338,7 +331,6 @@ if (mode === "first") {
           }
         } catch (e) {
           console.error("Mood analysis failed, using setup mood:", e);
-          // 분석 실패 시 setup mood 사용
         }
       }
 
@@ -358,8 +350,6 @@ if (mode === "first") {
         const genre = setup.genre || "일기";
         const { buildingId, floor, unit, isNew } = await assignBuildingSlot(genre, user?.id ?? null, forceNew);
         setIsNewBuilding(isNew);
-
-        // assignBuildingSlot 함수 내에서 이미 localStorage에 저장되므로 중복 저장 제거
 
         const { error } = await supabase.from("writings").insert({
           title: finalTitle,
@@ -489,42 +479,76 @@ if (mode === "first") {
             ) : (
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                 <span style={{ fontSize: "14px", marginRight: "2px" }}>🕯</span>
-                {(["first", "next", "full"] as const).map((mode) => {
-                  const labels = { first: "첫 문장", next: "다음 문장", full: "전체" };
-                  const isLoading = loading && aiMode === mode;
-                  return (
-                    <button
-                      key={mode}
-                      onClick={() => handleGenerate(mode)}
-                      disabled={loading}
-                      style={{
-                        padding: "7px 14px", borderRadius: "100px",
-                        border: `1px solid ${moodColor}${isLoading ? "60" : "35"}`,
-                        background: isLoading ? `${moodColor}18` : `${moodColor}0a`,
-                        color: isLoading ? moodColor : `${moodColor}cc`,
-                        fontFamily: "'Crimson Pro', serif", fontWeight: 200,
-                        fontSize: "12px", letterSpacing: "0.05em",
-                        cursor: loading ? "default" : "pointer",
-                        transition: "all 0.3s",
-                        whiteSpace: "nowrap",
-                      }}
-                      onMouseEnter={e => {
-                        if (!loading) {
-                          e.currentTarget.style.background = `${moodColor}18`;
-                          e.currentTarget.style.color = moodColor;
-                        }
-                      }}
-                      onMouseLeave={e => {
-                        if (!loading) {
-                          e.currentTarget.style.background = `${moodColor}0a`;
-                          e.currentTarget.style.color = `${moodColor}cc`;
-                        }
-                      }}
-                    >
-                      {isLoading ? "생각 중..." : labels[mode]}
-                    </button>
-                  );
-                })}
+                {isDiary ? (
+                  // 일기: 질문 생성만
+                  <button
+                    onClick={() => handleGenerate("question")}
+                    disabled={loading}
+                    style={{
+                      padding: "7px 14px", borderRadius: "100px",
+                      border: `1px solid ${moodColor}${loading && aiMode === "question" ? "60" : "35"}`,
+                      background: loading && aiMode === "question" ? `${moodColor}18` : `${moodColor}0a`,
+                      color: loading && aiMode === "question" ? moodColor : `${moodColor}cc`,
+                      fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+                      fontSize: "12px", letterSpacing: "0.05em",
+                      cursor: loading ? "default" : "pointer",
+                      transition: "all 0.3s",
+                      whiteSpace: "nowrap",
+                    }}
+                    onMouseEnter={e => {
+                      if (!loading) {
+                        e.currentTarget.style.background = `${moodColor}18`;
+                        e.currentTarget.style.color = moodColor;
+                      }
+                    }}
+                    onMouseLeave={e => {
+                      if (!loading) {
+                        e.currentTarget.style.background = `${moodColor}0a`;
+                        e.currentTarget.style.color = `${moodColor}cc`;
+                      }
+                    }}
+                  >
+                    {loading && aiMode === "question" ? "생각 중..." : "질문 생성"}
+                  </button>
+                ) : (
+                  // 시, 소설: 첫 문장, 다음 문장, 전체
+                  (["first", "next", "full"] as const).map((mode) => {
+                    const labels = { first: "첫 문장", next: "다음 문장", full: "전체" };
+                    const isLoading = loading && aiMode === mode;
+                    return (
+                      <button
+                        key={mode}
+                        onClick={() => handleGenerate(mode)}
+                        disabled={loading}
+                        style={{
+                          padding: "7px 14px", borderRadius: "100px",
+                          border: `1px solid ${moodColor}${isLoading ? "60" : "35"}`,
+                          background: isLoading ? `${moodColor}18` : `${moodColor}0a`,
+                          color: isLoading ? moodColor : `${moodColor}cc`,
+                          fontFamily: "'Crimson Pro', serif", fontWeight: 200,
+                          fontSize: "12px", letterSpacing: "0.05em",
+                          cursor: loading ? "default" : "pointer",
+                          transition: "all 0.3s",
+                          whiteSpace: "nowrap",
+                        }}
+                        onMouseEnter={e => {
+                          if (!loading) {
+                            e.currentTarget.style.background = `${moodColor}18`;
+                            e.currentTarget.style.color = moodColor;
+                          }
+                        }}
+                        onMouseLeave={e => {
+                          if (!loading) {
+                            e.currentTarget.style.background = `${moodColor}0a`;
+                            e.currentTarget.style.color = `${moodColor}cc`;
+                          }
+                        }}
+                      >
+                        {isLoading ? "생각 중..." : labels[mode]}
+                      </button>
+                    );
+                  })
+                )}
                 <button
                   onClick={() => setAiExpanded(false)}
                   style={{
@@ -597,7 +621,7 @@ if (mode === "first") {
             fontSize: "12px", color: "rgba(255,255,255,0.28)", letterSpacing: "0.04em",
           }}>
             {setup.genre && `${setup.genre} · `}
-            {setup.mood ? `${setup.mood} 감정` : "감정 설정 없음"}
+            {setup.mood ? `${setup.mood} 감정` : "글 속에서 감정을 찾을게요"}
           </p>
         </div>
 

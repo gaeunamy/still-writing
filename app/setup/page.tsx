@@ -39,7 +39,6 @@ export default function SetupPage() {
       setting: selectedSetting,
       ending: selectedEnding,
       length: selectedLength,
-      // mood는 저장하지 않음 - AI가 자동 분석
     }));
     router.push("/editor");
   };
@@ -143,8 +142,6 @@ export default function SetupPage() {
                 <Section title="결말 분위기" items={novelEndings} selected={selectedEnding} onSelect={setSelectedEnding} delay="0.25s" />
               </>
             )}
-
-            {/* 일기는 감정 선택 없음 - AI가 자동 분석 */}
 
             <Section title="길이" items={lengths} selected={selectedLength} onSelect={setSelectedLength} delay="0.3s" />
           </div>

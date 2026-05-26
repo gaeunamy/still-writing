@@ -29,7 +29,23 @@ export default function StartPage() {
 
   const handleSelect = (genre: string) => {
     localStorage.setItem("selectedGenre", genre);
-    router.push("/setup");
+
+    if (genre === "일기") {
+      // 일기는 Setup 스킵, 바로 Editor로
+      localStorage.setItem("writingSetup", JSON.stringify({
+        genre: "일기",
+        length: "길게", // 일기는 길게 고정
+        speaker: "",
+        image: "",
+        view: "",
+        setting: "",
+        ending: "",
+      }));
+      router.push("/editor");
+    } else {
+      // 시, 소설은 Setup으로
+      router.push("/setup");
+    }
   };
 
   return (
