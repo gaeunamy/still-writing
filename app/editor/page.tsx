@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
-import { Toast, useToast } from "../../components/Toast";
-import AuthGuard from "../../components/AuthGuard";
+import { Toast, useToast } from "../components/Toast";
+import AuthGuard from "../components/AuthGuard";
 
 type WritingSetup = {
   genre: string;
@@ -221,29 +221,165 @@ export default function EditorPage() {
 
     if (mode === "first") {
       if (setup.genre === "시") {
-        prompt = `${setup.speaker || "나"} 화자, ${setup.image || "밤"} 이미지를 담아 감성적인 시를 ${lengthText} 제안해주세요. 직접 이어 쓸 수 있도록 여운을 남겨주세요. 반드시 1~2문장만 써주세요.`;
+        prompt = `
+      ${setup.speaker || "나"} 화자,
+      ${setup.image || "밤"} 이미지를 담아
+      시의 도입처럼 짧은 첫 구절을 작성해주세요.
+
+      감정을 직접 설명하기보다
+      장면과 이미지 중심으로 표현해주세요.
+
+      줄글처럼 이어 쓰지 말고,
+      시처럼 줄을 나누어 작성해주세요.
+
+      한 문장을 길게 쓰기보다
+      짧은 구절 중심으로 작성해주세요.
+
+      지나치게 문학적이거나 거창한 표현은 피하고,
+      사용자가 이어 쓰고 싶어지는 여백을 남겨주세요.
+
+      한 줄 또는 짧은 두 줄 정도로만 작성해주세요.
+      `.trim();
+
       } else if (setup.genre === "소설") {
-        prompt = `${setup.view || "1인칭"} 시점, ${setup.setting || "도시"} 배경, ${setup.ending || "열린 결말"} 분위기로 독자가 몰입할 수 있는 소설의 첫 장면을 ${lengthText} 제안해주세요. 반드시 1~2문장만 써주세요.`;
+        prompt = `
+    ${setup.view || "1인칭"} 시점,
+    ${setup.setting || "도시"} 배경,
+    ${setup.ending || "열린 결말"} 분위기로
+    독자가 몰입할 수 있는 소설의 첫 장면을 ${lengthText} 제안해주세요.
+
+    설명보다 장면과 행동 중심으로 작성해주세요.
+    반드시 1~2문장만 작성해주세요.
+    `.trim();
       }
+
     } else if (mode === "next") {
-      const currentText = content.trim() || "아직 쓴 내용이 없습니다.";
+
+      const currentText =
+        content.trim() || "아직 쓴 내용이 없습니다.";
+
       if (setup.genre === "시") {
-        prompt = `다음은 지금까지 쓴 시입니다:\n\n"${currentText}"\n\n이 흐름에 자연스럽게 이어지는 다음 문장을 ${lengthText} 제안해주세요. 같은 이미지와 감정을 유지해주세요.`;
+        prompt = `
+      다음은 지금까지 쓴 시입니다.
+
+      "${currentText}"
+
+      사용자가 쓴 문장의 말투, 호흡, 종결 방식을 따라
+      자연스럽게 이어지는 다음 구절을 제안해주세요.
+
+      AI가 새로운 시를 완성하기보다,
+      사용자가 이어 쓴 듯한 느낌으로 작성해주세요.
+
+      같은 이미지와 감정을 유지하되
+      이미 나온 표현은 반복하지 말아주세요.
+
+      지나치게 추상적이거나 거창한 표현은 피하고,
+      짧고 담백하게 작성해주세요.
+
+      완성된 시처럼 마무리하지 말고,
+      다음 줄을 이어 쓰고 싶어지는 여백을 남겨주세요.
+
+      반드시 1~3줄 정도로만 작성해주세요.
+      `.trim();
+
       } else if (setup.genre === "소설") {
-        prompt = `다음은 지금까지 쓴 소설입니다:\n\n"${currentText}"\n\n이 장면에서 자연스럽게 이어지는 다음 문장을 ${lengthText} 제안해주세요. 같은 시점과 분위기를 유지해주세요.`;
+        prompt = `
+    다음은 지금까지 쓴 소설입니다.
+
+    "${currentText}"
+    사용자의 문체와 호흡을 유지하며
+    자연스럽게 이어지는 다음 장면을 작성해주세요.
+
+    감정이나 의미를 설명하지 말고,
+    행동과 장면으로 보여주세요.
+
+    비유나 표현을 과하게 꾸미지 말고,
+    눈에 보이거나 들리는 디테일 중심으로 작성해주세요.
+
+    현재 장면에서 이어질 수 있는
+    행동과 상황을 자연스럽게 이어주세요.
+
+    짧고 담백하게 작성하고,
+    마지막은 설명 대신 이미지로 끝맺어주세요.
+
+    반드시 2~4문장만 작성해주세요.
+    `.trim();
       }
+
     } else if (mode === "full") {
-      const titleHint = title ? `제목: "${title}"\n` : "";
-      const contentHint = content.trim() ? `지금까지 쓴 내용:\n"${content.trim()}"\n\n이 내용을 바탕으로 ` : "";
+
+      const titleHint = title
+        ? `제목: "${title}"\n`
+        : "";
+
+      const contentHint = content.trim()
+        ? `지금까지 쓴 내용:\n"${content.trim()}"\n\n이 내용을 바탕으로 `
+        : "";
+
       if (setup.genre === "시") {
-        prompt = `${titleHint}${contentHint}${setup.speaker || "나"} 화자, ${setup.image || "밤"} 이미지를 담아 완성된 시 한 편을 ${lengthText} 써주세요.`;
+        prompt = `
+      ${setup.speaker || "나"} 화자,
+      ${setup.image || "밤"} 이미지를 담아
+      짧고 자연스러운 현대시를 ${lengthText} 작성해주세요.
+
+      감정을 직접 설명하기보다
+      장면과 이미지 중심으로 표현해주세요.
+
+      지나치게 거창하거나
+      익숙한 문학 표현은 피해주세요.
+
+      줄글처럼 이어 쓰지 말고,
+      시처럼 자연스럽게 줄을 나누어 작성해주세요.
+
+      교훈처럼 마무리하지 말고,
+      잔잔한 여운이 남도록 끝맺어주세요.
+    `.trim();
+
       } else if (setup.genre === "소설") {
-        prompt = `${titleHint}${contentHint}${setup.view || "1인칭"} 시점, ${setup.setting || "도시"} 배경, ${setup.ending || "열린 결말"} 분위기의 소설 한 편을 ${lengthText} 써주세요.`;
+        prompt = `
+    ${titleHint}${contentHint}
+    ${setup.view || "1인칭"} 시점,
+    ${setup.setting || "도시"} 배경,
+    ${setup.ending || "열린 결말"} 분위기의
+    짧은 소설을 ${lengthText} 작성해주세요.
+
+    감정이나 메시지를 직접 설명하지 말고,
+    장면과 행동 중심으로 보여주세요.
+
+    추상적인 표현보다
+    눈에 보이거나 들리는 장면을 우선해주세요.
+
+    지나치게 문학적이거나
+    익숙한 감성 표현은 피해주세요.
+
+    문장을 과하게 길게 늘이지 말고,
+    자연스럽고 담백한 흐름으로 작성해주세요.
+
+    감정을 직접 강조하기보다,
+    독자가 장면 속에서 자연스럽게 느낄 수 있도록 작성해주세요.
+
+    교훈처럼 마무리하지 말고,
+    마지막은 장면, 소리, 행동, 시선 같은
+    구체적인 이미지로 끝맺어주세요.
+    `.trim();
       }
+
     } else if (mode === "question") {
+
       // 일기 질문 생성
-      const contentHint = content.trim() ? `지금까지 쓴 내용:\n"${content.trim()}"\n\n이를 바탕으로 ` : "";
-      prompt = `${contentHint}오늘 하루를 더 깊이 있게 돌아볼 수 있는 질문 1개만 던져주세요. 짧고 구체적으로, 질문만 써주세요.`;
+      const contentHint = content.trim()
+        ? `지금까지 쓴 내용:\n"${content.trim()}"\n\n이를 바탕으로 `
+        : "";
+
+      prompt = `
+    ${contentHint}
+    사용자가 자신의 감정과 기억을 더 깊게 떠올릴 수 있도록
+    짧고 자연스러운 질문 하나를 작성해주세요.
+
+    부담스럽거나 상담처럼 느껴지지 않게,
+    조용히 생각을 이어갈 수 있는 톤으로 작성해주세요.
+    반드시 한 문장만 작성해주세요.
+    `.trim();
     }
 
     if (!prompt) {
