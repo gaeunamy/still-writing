@@ -225,18 +225,18 @@ export default function EditorPage() {
 
     let prompt = "";
 
-    if (mode === "first") {
+if (mode === "first") {
       if (setup.genre === "시") {
-        prompt = `${setup.mood || "고요한"} 정서, ${setup.speaker || "나"} 화자, ${setup.image || "밤"} 이미지를 담아 감성적인 시를 ${lengthText} 제안해주세요. 직접 이어 쓸 수 있도록 여운을 남겨주세요. 반드시 1~2문장만 써주세요.`;
+        prompt = `${setup.speaker || "나"} 화자, ${setup.image || "밤"} 이미지를 담아 감성적인 시를 ${lengthText} 제안해주세요. 직접 이어 쓸 수 있도록 여운을 남겨주세요. 반드시 1~2문장만 써주세요.`;
       } else if (setup.genre === "소설") {
         prompt = `${setup.view || "1인칭"} 시점, ${setup.setting || "도시"} 배경, ${setup.ending || "열린 결말"} 분위기로 독자가 몰입할 수 있는 소설의 첫 장면을 ${lengthText} 제안해주세요. 반드시 1~2문장만 써주세요.`;
       } else {
-        prompt = `${setup.mood || "차분한"} 감정으로 오늘 하루를 돌아볼 수 있는 일기 시작 질문 1개만 던져주세요. 짧고 구체적으로, 질문만 써주세요.`;
+        prompt = `오늘 하루를 돌아볼 수 있는 일기 시작 질문 1개만 던져주세요. 짧고 구체적으로, 질문만 써주세요.`;
       }
     } else if (mode === "next") {
       const currentText = content.trim() || "아직 쓴 내용이 없습니다.";
       if (setup.genre === "시") {
-        prompt = `다음은 지금까지 쓴 시입니다:\n\n"${currentText}"\n\n이 흐름에 자연스럽게 이어지는 다음 문장을 ${lengthText} 제안해주세요. 같은 정서와 이미지를 유지해주세요.`;
+        prompt = `다음은 지금까지 쓴 시입니다:\n\n"${currentText}"\n\n이 흐름에 자연스럽게 이어지는 다음 문장을 ${lengthText} 제안해주세요. 같은 이미지와 감정을 유지해주세요.`;
       } else if (setup.genre === "소설") {
         prompt = `다음은 지금까지 쓴 소설입니다:\n\n"${currentText}"\n\n이 장면에서 자연스럽게 이어지는 다음 문장을 ${lengthText} 제안해주세요. 같은 시점과 분위기를 유지해주세요.`;
       } else {
@@ -246,11 +246,11 @@ export default function EditorPage() {
       const titleHint = title ? `제목: "${title}"\n` : "";
       const contentHint = content.trim() ? `지금까지 쓴 내용:\n"${content.trim()}"\n\n이 내용을 바탕으로 ` : "";
       if (setup.genre === "시") {
-        prompt = `${titleHint}${contentHint}${setup.mood || "고요한"} 정서, ${setup.speaker || "나"} 화자, ${setup.image || "밤"} 이미지를 담아 완성된 시 한 편을 ${lengthText} 써주세요.`;
+        prompt = `${titleHint}${contentHint}${setup.speaker || "나"} 화자, ${setup.image || "밤"} 이미지를 담아 완성된 시 한 편을 ${lengthText} 써주세요.`;
       } else if (setup.genre === "소설") {
         prompt = `${titleHint}${contentHint}${setup.view || "1인칭"} 시점, ${setup.setting || "도시"} 배경, ${setup.ending || "열린 결말"} 분위기의 소설 한 편을 ${lengthText} 써주세요.`;
       } else {
-        prompt = `${setup.mood || "차분한"} 감정으로 오늘 하루를 돌아볼 수 있는 일기 작성용 질문 4~5개를 만들어주세요. 번호 없이 · 기호로 시작하게 써주세요. 질문만 써주세요.`;
+        prompt = `${titleHint}${contentHint}오늘 하루를 돌아볼 수 있는 일기 작성용 질문 4~5개를 만들어주세요. 번호 없이 · 기호로 시작하게 써주세요. 질문만 써주세요.`;
       }
     }
 
@@ -319,14 +319,37 @@ export default function EditorPage() {
       // 비동기 타이밍 이슈 방지를 위해 최종 저장 제목 가공 처리
       const finalTitle = title.trim() || "[無題]";
 
+      // AI가 글의 mood를 분석
+      let analyzedMood = setup.mood || null;
+      let analyzedColor = moodColor;
+
+      if (content.trim()) {
+        try {
+          const moodRes = await fetch("/api/analyze-mood", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ content: content.trim(), genre: setup.genre || "일기" }),
+          });
+          const moodData = await moodRes.json();
+          if (moodData.mood && moodData.color) {
+            analyzedMood = moodData.mood;
+            analyzedColor = moodData.color;
+            console.log("✨ AI analyzed mood:", analyzedMood, "color:", analyzedColor);
+          }
+        } catch (e) {
+          console.error("Mood analysis failed, using setup mood:", e);
+          // 분석 실패 시 setup mood 사용
+        }
+      }
+
       if (mode === "future") {
         const { error } = await supabase.from("writings").insert({
           title: finalTitle,
           content,
           genre: setup.genre || "일기",
-          mood: setup.mood || null,
+          mood: analyzedMood,
           is_public: false,
-          emotion_color: moodColor,
+          emotion_color: analyzedColor,
           open_at: openAt ? new Date(openAt).toISOString() : null,
           user_id: user?.id ?? null,
         });
@@ -342,9 +365,9 @@ export default function EditorPage() {
           title: finalTitle,
           content,
           genre,
-          mood: setup.mood || null,
+          mood: analyzedMood,
           is_public: mode === "public",
-          emotion_color: moodColor,
+          emotion_color: analyzedColor,
           building_id: buildingId,
           floor,
           unit,

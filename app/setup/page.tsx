@@ -5,14 +5,11 @@ import { useRouter } from "next/navigation";
 import AuthGuard from "../components/AuthGuard";
 
 const poemSpeakers = ["나", "익명의 화자", "과거의 나"];
-const poemMoods = ["고요한", "쓸쓸한", "몽환적인", "따뜻한"];
 const poemImages = ["새벽", "여름", "바다", "비", "기억"];
 
 const novelViews = ["1인칭", "3인칭", "전지적 작가 시점"];
 const novelSettings = ["도시", "바다", "학교", "기억 속 장소"];
 const novelEndings = ["열린 결말", "쓸쓸한 결말", "따뜻한 결말"];
-
-const diaryMoods = ["고요한", "쓸쓸한", "따뜻한", "기쁜", "우울한", "차분한"];
 
 const lengths = ["짧게", "적당히", "길게"];
 
@@ -21,7 +18,6 @@ export default function SetupPage() {
   const [genre, setGenre] = useState("");
 
   const [selectedSpeaker, setSelectedSpeaker] = useState("");
-  const [selectedMood, setSelectedMood] = useState("");
   const [selectedImage, setSelectedImage] = useState("");
   const [selectedView, setSelectedView] = useState("");
   const [selectedSetting, setSelectedSetting] = useState("");
@@ -38,12 +34,12 @@ export default function SetupPage() {
     localStorage.setItem("writingSetup", JSON.stringify({
       genre,
       speaker: selectedSpeaker,
-      mood: selectedMood,
       image: selectedImage,
       view: selectedView,
       setting: selectedSetting,
       ending: selectedEnding,
       length: selectedLength,
+      // mood는 저장하지 않음 - AI가 자동 분석
     }));
     router.push("/editor");
   };
@@ -135,7 +131,6 @@ export default function SetupPage() {
             {genre === "시" && (
               <>
                 <Section title="화자" items={poemSpeakers} selected={selectedSpeaker} onSelect={setSelectedSpeaker} delay="0.15s" />
-                <Section title="정서" items={poemMoods} selected={selectedMood} onSelect={setSelectedMood} delay="0.2s" />
                 <Section title="이미지" items={poemImages} selected={selectedImage} onSelect={setSelectedImage} delay="0.25s" />
               </>
             )}
@@ -149,10 +144,7 @@ export default function SetupPage() {
               </>
             )}
 
-            {/* 일기 옵션 */}
-            {genre === "일기" && (
-              <Section title="오늘의 감정" items={diaryMoods} selected={selectedMood} onSelect={setSelectedMood} delay="0.15s" />
-            )}
+            {/* 일기는 감정 선택 없음 - AI가 자동 분석 */}
 
             <Section title="길이" items={lengths} selected={selectedLength} onSelect={setSelectedLength} delay="0.3s" />
           </div>
